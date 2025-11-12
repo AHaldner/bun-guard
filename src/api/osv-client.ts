@@ -28,10 +28,10 @@ const fetchVulnDetailsByIds = async (ids: string[]): Promise<Map<string, OSVVuln
 	return vulnerabilityDetailsMap;
 };
 
-const queryOSVBatch = async (packages: Package[]): Promise<OSVVulnerability[][]> => {
+const queryOSVBatch = async (packages: Bun.Security.Package[]): Promise<OSVVulnerability[][]> => {
 	if (packages.length === 0) return [];
 
-	const packageChunks: Package[][] = [];
+	const packageChunks: Bun.Security.Package[][] = [];
 
 	for (let i = 0; i < packages.length; i += BATCH_SIZE) {
 		packageChunks.push(packages.slice(i, i + BATCH_SIZE));
@@ -41,7 +41,7 @@ const queryOSVBatch = async (packages: Package[]): Promise<OSVVulnerability[][]>
 
 	for (const packageChunk of packageChunks) {
 		const batchRequestBody: OSVBatchRequest = {
-			queries: packageChunk.map((packageInfo: Package) => ({
+			queries: packageChunk.map((packageInfo: Bun.Security.Package) => ({
 				version: packageInfo.version,
 				package: {name: packageInfo.name, ecosystem: 'npm'},
 			})),
@@ -106,7 +106,7 @@ const queryOSVBatch = async (packages: Package[]): Promise<OSVVulnerability[][]>
 	return allResults;
 };
 
-const queryOSV = async (packageInfo: Package): Promise<OSVVulnerability[]> => {
+const queryOSV = async (packageInfo: Bun.Security.Package): Promise<OSVVulnerability[]> => {
 	const osvQueryRequest: OSVQuery = {
 		version: packageInfo.version,
 		package: {
@@ -166,7 +166,7 @@ const getAdvisoryLevel = (vulnerability: OSVVulnerability): 'fatal' | 'warn' => 
 const listVulnerablePackages = (
 	vulnerabilities: OSVVulnerability[],
 	packageName: string,
-): Advisory[] => {
+): Bun.Security.Advisory[] => {
 	const advisoryResults = [];
 
 	for (const vulnerability of vulnerabilities) {

@@ -1,9 +1,9 @@
 import {queryOSVBatch, queryOSV, listVulnerablePackages} from '@api/osv-client';
 
-export const scanner: Scanner = {
+export const scanner: Bun.Security.Scanner = {
 	version: '1',
 	async scan({packages}) {
-		const securityAdvisories: Advisory[] = [];
+		const securityAdvisories: Bun.Security.Advisory[] = [];
 
 		if (packages.length === 0) return securityAdvisories;
 
