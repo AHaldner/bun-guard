@@ -1,5 +1,6 @@
-import {queryOSVBatch, queryOSV, listVulnerablePackages} from '@api/osv-client';
+import {queryOSV, listVulnerablePackages} from '@api/osv-client';
 import {validateSemverRange} from '@validators/semver-check';
+import {checkPackageVulnerabilities} from '@validators/osv-check';
 
 export const scanner: Bun.Security.Scanner = {
 	version: '1',
@@ -8,25 +9,12 @@ export const scanner: Bun.Security.Scanner = {
 
 		if (packages.length === 0) return securityAdvisories;
 
+		const semverAdvisories = validateSemverRange(packages);
+		securityAdvisories.push(...semverAdvisories);
+
 		try {
-			const semverAdvisories = validateSemverRange(packages);
-			securityAdvisories.push(...semverAdvisories);
-
-			const batchedVulnerabilities = await queryOSVBatch(packages);
-
-			for (let packageIndex = 0; packageIndex < packages.length; packageIndex++) {
-				const packageVulnerabilities = batchedVulnerabilities[packageIndex] || [];
-				if (packageVulnerabilities.length === 0) continue;
-
-				const currentPackage = packages[packageIndex];
-				if (!currentPackage) continue;
-
-				const packageAdvisories = listVulnerablePackages(
-					packageVulnerabilities,
-					currentPackage.name,
-				);
-				securityAdvisories.push(...packageAdvisories);
-			}
+			const packageAdvisories = await checkPackageVulnerabilities(packages);
+			securityAdvisories.push(...packageAdvisories);
 		} catch (_batchError) {
 			for (const packageInfo of packages) {
 				const individualPackageVulnerabilities = await queryOSV(packageInfo);
