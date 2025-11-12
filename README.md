@@ -13,6 +13,7 @@ For each package (name + version) that Bun plans to install, Bun Guard:
 1. Queries OSV in batches (`https://api.osv.dev/v1/querybatch`) for known vulnerabilities, then fetches full details via `GET /v1/vulns`.
 2. Maps each finding to an advisory with a severity level.
 3. Returns all advisories to Bun to determine whether to continue.
+4. Validates that the resolved version satisfies its requested semver range (when provided) using `Bun.semver.satisfies`; mismatches are reported as fatal advisories.
 
 Advisories are always shown to the user. Fatal advisories stop installation immediately, while warnings may allow the user to continue depending on TTY and settings.
 
@@ -91,10 +92,10 @@ bun link @tihn/bun-guard
 This package exports a single named export:
 
 ```ts
-export const scanner: Scanner
+export const scanner: Bun.Security.Scanner
 ```
 
-Where `Scanner` follows Bun’s Security Scanner API (version `"1"`). See `src/types/scanner-types.d.ts` for local type shapes.
+Where `Bun.Security.Scanner` follows Bun’s Security Scanner API (version `"1"`).
 
 ## Limitations
 
