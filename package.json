@@ -1,7 +1,7 @@
 {
 	"name": "@tihn/bun-guard",
 	"description": "A security scanner for Bun's package manager",
-	"version": "1.0.1",
+	"version": "1.1.0",
 	"author": "Andrin Haldner",
 	"license": "MIT",
 	"exports": {
