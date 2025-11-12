@@ -1,4 +1,5 @@
 import {queryOSVBatch, queryOSV, listVulnerablePackages} from '@api/osv-client';
+import {validateSemverRange} from '@validators/semver-check';
 
 export const scanner: Bun.Security.Scanner = {
 	version: '1',
@@ -8,6 +9,9 @@ export const scanner: Bun.Security.Scanner = {
 		if (packages.length === 0) return securityAdvisories;
 
 		try {
+			const semverAdvisories = validateSemverRange(packages);
+			securityAdvisories.push(...semverAdvisories);
+
 			const batchedVulnerabilities = await queryOSVBatch(packages);
 
 			for (let packageIndex = 0; packageIndex < packages.length; packageIndex++) {
