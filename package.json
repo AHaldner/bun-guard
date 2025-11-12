@@ -1,0 +1,25 @@
+{
+	"name": "@acme/bun",
+	"description": "Bun security scanner for acmecorp",
+	"version": "1.0.0",
+	"author": "Acme",
+	"license": "MIT",
+	"exports": {
+		"./package.json": "./package.json",
+		".": "./src/index.ts"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/acme/bun"
+	},
+	"keywords": [
+		"bun",
+		"security",
+		"provider"
+	],
+	"devDependencies": {
+		"@types/bun": "latest",
+		"prettier": "^3.6.2",
+		"typescript": "^5.9.2"
+	}
+}
