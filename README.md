@@ -1,19 +1,32 @@
-# Bun Guard — OSV‑Powered Security Scanner for Bun
+# 🛡️ Bun Guard — OSV‑Powered Security Scanner for Bun
 
 `@tihn/bun-guard` is a security scanner for Bun’s package installation flow. It checks every package being installed against the Open Source Vulnerabilities (OSV) database and returns advisories that can stop or gate installations based on severity.
 
-📦 Package: `@tihn/bun-guard`
+## Usage
 
-📚 Scanner API docs: <https://bun.com/docs/install/security-scanner-api>
+1. Install the scanner in your project:
+
+```bash
+bun add -D @tihn/bun-guard
+```
+
+2. Configure Bun to use the scanner in your `bunfig.toml`.
+
+```toml
+[install.security]
+scanner = "@tihn/bun-guard"
+```
+
+Once configured, Bun will call the scanner’s exported `scanner` during `bun install`.
 
 ## What It Does
 
 For each package (name + version) that Bun plans to install, Bun Guard:
 
-1. Queries OSV in batches (`https://api.osv.dev/v1/querybatch`) for known vulnerabilities, then fetches full details via `GET /v1/vulns`.
-2. Maps each finding to an advisory with a severity level.
-3. Returns all advisories to Bun to determine whether to continue.
-4. Validates that the resolved version satisfies its requested semver range (when provided) using `Bun.semver.satisfies`; mismatches are reported as fatal advisories.
+1. Validates that the resolved version satisfies its requested semver range (when provided) using `Bun.semver.satisfies`; mismatches are reported as fatal advisories.
+2. Queries OSV in batches (`https://api.osv.dev/v1/querybatch`) for known vulnerabilities, then fetches full details via `GET /v1/vulns`.
+3. Maps each finding to an advisory with a severity level.
+4. Returns all advisories to Bun to determine whether to continue.
 
 Advisories are always shown to the user. Fatal advisories stop installation immediately, while warnings may allow the user to continue depending on TTY and settings.
 
@@ -27,21 +40,6 @@ Advisories are always shown to the user. Fatal advisories stop installation imme
   - Any other detected vulnerability
 
 Each advisory includes the package name, a description (summary/details), and a reference URL when available.
-
-## Usage
-
-1) Install the scanner in your project:
-
-```bash
-bun add -D @tihn/bun-guard
-```
-
-2) Configure Bun to use the scanner in your `bunfig.toml`.
-
-See Bun’s Security Scanner configuration guide for the exact configuration keys and examples:
-<https://bun.com/docs/install/security-scanner-api>
-
-Once configured, Bun will call the scanner’s exported `scanner` during `bun install`.
 
 ## Behavior and Failure Modes
 
@@ -60,24 +58,24 @@ Once configured, Bun will call the scanner’s exported `scanner` during `bun in
 
 ## Development
 
-- Build and typecheck: handled by Bun + TypeScript (`tsconfig.json`).
-- Test:
+Build and type-check with Bun and TypeScript (configured via `tsconfig.json`).
+
+Run tests with:
 
 ```bash
 bun test
 ```
 
-The tests cover expected fatal detection for `event-stream@3.3.6`, benign popular packages, empty inputs, and API failure handling.
+Tests verify:
 
-## Publishing
+- fatal detection for event-stream@3.3.6
+- handling of common benign packages
+- empty input behavior
+- semver mismatch handling
+- API failure handling
 
-Publish to npm:
 
-```bash
-bun publish
-```
-
-To test locally before publishing, use `bun link`:
+To test locally using `bun link`:
 
 ```bash
 # In this repo
