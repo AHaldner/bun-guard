@@ -1,108 +1,106 @@
-<img src="https://bun.com/logo.png" height="36" />
+# Bun Guard — OSV‑Powered Security Scanner for Bun
 
-# Bun Security Scanner Template
+`@tihn/bun-guard` is a security scanner for Bun’s package installation flow. It checks every package being installed against the Open Source Vulnerabilities (OSV) database and returns advisories that can stop or gate installations based on severity.
 
-A template for creating a security scanner for Bun's package installation
-process. Security scanners scan packages against your threat intelligence feeds
-and control whether installations proceed based on detected threats.
+📦 Package: `@tihn/bun-guard`
 
-📚 [**Full documentation**](https://bun.com/docs/install/security-scanner-api)
+📚 Scanner API docs: <https://bun.com/docs/install/security-scanner-api>
 
-## How It Works
+## What It Does
 
-When packages are installed via Bun, your security scanner:
+For each package (name + version) that Bun plans to install, Bun Guard:
 
-1. **Receives** package information (name, version)
-2. **Queries** your threat intelligence API
-3. **Validates** the response data
-4. **Categorizes** threats by severity
-5. **Returns** advisories to control installation (empty array if safe)
+1. Queries OSV (`https://api.osv.dev/v1/query`) for known vulnerabilities.
+2. Maps each finding to an advisory with a severity level.
+3. Returns all advisories to Bun to determine whether to continue.
 
-### Advisory Levels
+Advisories are always shown to the user. Fatal advisories stop installation immediately, while warnings may allow the user to continue depending on TTY and settings.
 
-- **Fatal** (`level: 'fatal'`): Installation stops immediately
-  - Examples: malware, token stealers, backdoors, critical vulnerabilities
-- **Warning** (`level: 'warn'`): User prompted for confirmation
-  - In TTY: User can choose to continue or cancel
-  - Non-TTY: Installation automatically cancelled
-  - Examples: protestware, adware, deprecated packages
+## Advisory Rules
 
-All advisories are always displayed to the user regardless of level.
+- Fatal (`level: 'fatal'`)
+  - OSV marks a vulnerability as CRITICAL, or
+  - CVSS v3 impact indicates High for Confidentiality, Integrity, or Availability (C:H, I:H, or A:H)
 
-### Error Handling
+- Warning (`level: 'warn'`)
+  - Any other detected vulnerability
 
-If your `scan` function throws an error, it will be gracefully handled by Bun, but the installation process **will be cancelled** as a defensive precaution.
+Each advisory includes the package name, a description (summary/details), and a reference URL when available.
 
-### Validation
+## Usage
 
-When fetching threat feeds over the network, use schema validation  
-(e.g., Zod) to ensure data integrity. Invalid responses should fail immediately
-rather than silently returning empty advisories.
+1) Install the scanner in your project:
 
-```typescript
-import {z} from 'zod';
-
-const ThreatFeedItemSchema = z.object({
-	package: z.string(),
-	version: z.string(),
-	url: z.string().nullable(),
-	description: z.string().nullable(),
-	categories: z.array(z.enum(['backdoor', 'botnet' /* ... */])),
-});
+```bash
+bun add -D @tihn/bun-guard
 ```
 
-### Useful Bun APIs
+2) Configure Bun to use the scanner in your `bunfig.toml`.
 
-Bun provides several built-in APIs that are particularly useful for security scanner:
+See Bun’s Security Scanner configuration guide for the exact configuration keys and examples:
+<https://bun.com/docs/install/security-scanner-api>
 
-- [**Security scanner API Reference**](https://bun.com/docs/install/security-scanner-api): Complete API documentation for security scanners
-- [**`Bun.semver.satisfies()`**](https://bun.com/docs/api/semver): Essential for checking if package versions match vulnerability ranges. No external dependencies needed.
+Once configured, Bun will call the scanner’s exported `scanner` during `bun install`.
 
-  ```typescript
-  if (Bun.semver.satisfies(version, '>=1.0.0 <1.2.5')) {
-  	// Version is vulnerable
-  }
-  ```
+## Behavior and Failure Modes
 
-- [**`Bun.hash`**](https://bun.com/docs/api/hashing#bun-hash): Fast hashing for package integrity checks
-- [**`Bun.file`**](https://bun.com/docs/api/file-io): Efficient file I/O, could be used for reading local threat databases
+- Network: The scanner queries OSV over HTTPS. If the API call fails or returns a non‑OK status, Bun Guard currently returns an empty advisory list for that package (installation proceeds).
+- Performance: Packages are queried sequentially. Typical scans remain fast; the test suite asserts completion within a reasonable time window for a small set of packages.
 
-## Testing
+## Development
 
-This template includes tests for a known malicious package version.
-Customize the test file as needed.
+- Build and typecheck: handled by Bun + TypeScript (`tsconfig.json`).
+- Test:
 
 ```bash
 bun test
 ```
 
-## Publishing Your Provider
+The tests cover expected fatal detection for `event-stream@3.3.6`, benign popular packages, empty inputs, and API failure handling.
 
-Publish your security scanner to npm:
+## Publishing
+
+Publish to npm:
 
 ```bash
 bun publish
 ```
 
-Users can now install your provider and add it to their `bunfig.toml` configuration.
-
-To test locally before publishing, use [`bun link`](https://bun.sh/docs/cli/link):
+To test locally before publishing, use `bun link`:
 
 ```bash
-# In your provider directory
+# In this repo
 bun link
 
-# In your test project
-bun link @acme/bun # this is the name in package.json of your provider
+# In a separate test project
+bun link @tihn/bun-guard
 ```
 
-## Contributing
+## API Surface
 
-This is a template repository. Fork it and customize for your organization's
-security requirements.
+This package exports a single named export:
+
+```ts
+export const scanner: Scanner
+```
+
+Where `Scanner` follows Bun’s Security Scanner API (version `"1"`). See `src/types/scanner-types.d.ts` for local type shapes.
+
+## Limitations
+
+- OSV coverage: Advisories depend on OSV’s dataset. Not all risks (e.g., protestware, license issues) are represented.
+- No local caching: Queries are performed at install time without persistent caching.
+- Conservative failure handling: Network/API errors return no advisories rather than failing the install.
+
+## Changelog
+
+See `CHANGELOG.md` for release notes. Current version: `1.0.0`.
+
+## License
+
+MIT © Andrin Haldner
 
 ## Support
 
-For docs and questions, see the [Bun documentation](https://bun.com/docs/install/security-scanner-api) or [Join our Discord](https://bun.com/discord).
-
-For template issues, please open an issue in this repository.
+- Bun Security Scanner API: <https://bun.com/docs/install/security-scanner-api>
+- Issues and contributions: open an issue or PR on this repository.
