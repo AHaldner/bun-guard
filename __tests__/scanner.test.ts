@@ -1,9 +1,18 @@
-import {describe, test, expect, beforeAll} from 'bun:test';
-import {scanner} from '../src/index';
+import {describe, test, expect} from 'bun:test';
+import {scanner} from 'src';
+
+const createMockPackage = (name: string, version: string) => {
+	return {
+		name,
+		version,
+		tarball: `https://registry.npmjs.org/${name}/-/${name}-${version}.tgz`,
+		requestedRange: `^${version}`,
+	};
+};
 
 describe('Security Scanner', () => {
 	test('should detect known vulnerable package (event-stream 3.3.6)', async () => {
-		const packages = [{name: 'event-stream', version: '3.3.6'}];
+		const packages = [createMockPackage('event-stream', '3.3.6')];
 
 		const results = await scanner.scan({packages});
 
@@ -14,7 +23,7 @@ describe('Security Scanner', () => {
 	});
 
 	test('should not flag safe version of event-stream', async () => {
-		const packages = [{name: 'event-stream', version: '3.3.4'}];
+		const packages = [createMockPackage('event-stream', '3.3.4')];
 
 		const results = await scanner.scan({packages});
 
@@ -22,10 +31,7 @@ describe('Security Scanner', () => {
 	});
 
 	test('should not flag popular safe packages', async () => {
-		const packages = [
-			{name: 'lodash', version: '4.17.21'},
-			{name: 'react', version: '18.2.0'},
-		];
+		const packages = [createMockPackage('lodash', '4.17.21'), createMockPackage('react', '18.2.0')];
 
 		const results = await scanner.scan({packages});
 
@@ -33,7 +39,7 @@ describe('Security Scanner', () => {
 	});
 
 	test('should handle non-existent packages gracefully', async () => {
-		const packages = [{name: 'this-package-does-not-exist-12345', version: '1.0.0'}];
+		const packages = [createMockPackage('this-package-does-not-exist-12345', '1.0.0')];
 
 		const results = await scanner.scan({packages});
 
@@ -42,9 +48,9 @@ describe('Security Scanner', () => {
 
 	test('should detect vulnerabilities in mixed package list', async () => {
 		const packages = [
-			{name: 'lodash', version: '4.17.21'},
-			{name: 'event-stream', version: '3.3.6'},
-			{name: 'react', version: '18.2.0'},
+			createMockPackage('lodash', '4.17.21'),
+			createMockPackage('event-stream', '3.3.6'),
+			createMockPackage('react', '18.2.0'),
 		];
 
 		const results = await scanner.scan({packages});
@@ -55,7 +61,7 @@ describe('Security Scanner', () => {
 	});
 
 	test('should return correct advisory structure', async () => {
-		const packages = [{name: 'event-stream', version: '3.3.6'}];
+		const packages = [createMockPackage('event-stream', '3.3.6')];
 
 		const results = await scanner.scan({packages});
 
@@ -75,7 +81,7 @@ describe('Security Scanner', () => {
 	});
 
 	test('should handle empty package list', async () => {
-		const packages: Array<{name: string; version: string}> = [];
+		const packages: Bun.Security.Package[] = [];
 
 		const results = await scanner.scan({packages});
 
@@ -84,9 +90,9 @@ describe('Security Scanner', () => {
 
 	test('should complete scan within reasonable time', async () => {
 		const packages = [
-			{name: 'react', version: '18.2.0'},
-			{name: 'vue', version: '3.3.0'},
-			{name: 'lodash', version: '4.17.21'},
+			createMockPackage('react', '18.2.0'),
+			createMockPackage('vue', '3.3.0'),
+			createMockPackage('lodash', '4.17.21'),
 		];
 
 		const startTime = Date.now();
@@ -105,7 +111,7 @@ describe('Security Scanner', () => {
 
 describe('Scanner Integration', () => {
 	test('should handle API failures gracefully', async () => {
-		const packages = [{name: '', version: ''}];
+		const packages = [createMockPackage('', '')];
 
 		const results = await scanner.scan({packages});
 		expect(Array.isArray(results)).toBe(true);
