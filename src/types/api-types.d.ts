@@ -18,3 +18,15 @@ interface OSVVulnerability {
 interface OSVResponse {
 	vulns: OSVVulnerability[];
 }
+
+interface OSVBatchRequest {
+	queries: OSVQuery[];
+}
+
+interface OSVBatchResult {
+	vulns?: Array<Pick<OSVVulnerability, 'id'> | OSVVulnerability>;
+}
+
+interface OSVBatchResponse {
+	results: OSVBatchResult[];
+}

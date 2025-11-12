@@ -5,8 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.0.1 (2025-11-12)
+
+### Added
+
+- Batch processing support for improved performance with multiple packages
+- Fallback mechanism to individual queries when batch processing fails
+
+### Changed
+
+- Improve variable naming throughout codebase for better readability and maintainability
+- Enhance code documentation with more descriptive variable names
+
 ## 1.0.0 (2025-11-12)
 
 ### Added
 
-- Initial release
+- Initial release with OSV.dev vulnerability database integration
+- Security scanner implementation for Bun packages
+- Comprehensive test suite with 10 test cases covering various scenarios
+- Proper error handling and graceful degradation
+- Enhance security advisory structure with detailed vulnerability information
+- Severity mapping (CRITICAL → fatal, others → warn)

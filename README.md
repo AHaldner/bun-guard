@@ -10,7 +10,7 @@
 
 For each package (name + version) that Bun plans to install, Bun Guard:
 
-1. Queries OSV (`https://api.osv.dev/v1/query`) for known vulnerabilities.
+1. Queries OSV in batches (`https://api.osv.dev/v1/querybatch`) for known vulnerabilities, then fetches full details via `GET /v1/vulns`.
 2. Maps each finding to an advisory with a severity level.
 3. Returns all advisories to Bun to determine whether to continue.
 
@@ -44,8 +44,18 @@ Once configured, Bun will call the scanner’s exported `scanner` during `bun in
 
 ## Behavior and Failure Modes
 
-- Network: The scanner queries OSV over HTTPS. If the API call fails or returns a non‑OK status, Bun Guard currently returns an empty advisory list for that package (installation proceeds).
-- Performance: Packages are queried sequentially. Typical scans remain fast; the test suite asserts completion within a reasonable time window for a small set of packages.
+- Network: The scanner queries OSV over HTTPS. If the API call fails or returns a non‑OK status, Bun Guard returns an empty advisory list for the affected packages (installation proceeds).
+- Query strategy:
+  - Primary: `POST /v1/querybatch` for all name@version pairs.
+  - Enrichment: When batch results only include vulnerability IDs, resolve full records via `GET /v1/vulns?ids=...` (deduplicated and chunked).
+  - Fallback: If enrichment fails for a batch, fall back to `POST /v1/query` per package to preserve correctness.
+- Performance: Requests are chunked to keep payloads manageable. Batch + enrichment minimizes round‑trips while retaining full vulnerability details for severity evaluation.
+
+## OSV Endpoints Used
+
+- `POST https://api.osv.dev/v1/querybatch` — initial batch lookup by package and version.
+- `GET  https://api.osv.dev/v1/vulns?ids=...` — resolves full vulnerability details for returned IDs.
+- `POST https://api.osv.dev/v1/query` — per‑package fallback when enrichment cannot be resolved.
 
 ## Development
 

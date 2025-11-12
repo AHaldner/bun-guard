@@ -1,18 +1,41 @@
-import {queryOSV, listVulnerablePackages} from '@api/osv-client';
+import {queryOSVBatch, queryOSV, listVulnerablePackages} from '@api/osv-client';
 
 export const scanner: Scanner = {
 	version: '1',
 	async scan({packages}) {
-		const results: Advisory[] = [];
+		const securityAdvisories: Advisory[] = [];
 
-		for (const pkg of packages) {
-			const vulnerabilities = await queryOSV(pkg);
-			if (vulnerabilities.length === 0) continue;
+		if (packages.length === 0) return securityAdvisories;
 
-			const advisories = listVulnerablePackages(vulnerabilities, pkg.name);
-			results.push(...advisories);
+		try {
+			const batchedVulnerabilities = await queryOSVBatch(packages);
+
+			for (let packageIndex = 0; packageIndex < packages.length; packageIndex++) {
+				const packageVulnerabilities = batchedVulnerabilities[packageIndex] || [];
+				if (packageVulnerabilities.length === 0) continue;
+
+				const currentPackage = packages[packageIndex];
+				if (!currentPackage) continue;
+
+				const packageAdvisories = listVulnerablePackages(
+					packageVulnerabilities,
+					currentPackage.name,
+				);
+				securityAdvisories.push(...packageAdvisories);
+			}
+		} catch (_batchError) {
+			for (const packageInfo of packages) {
+				const individualPackageVulnerabilities = await queryOSV(packageInfo);
+				if (individualPackageVulnerabilities.length === 0) continue;
+
+				const individualPackageAdvisories = listVulnerablePackages(
+					individualPackageVulnerabilities,
+					packageInfo.name,
+				);
+				securityAdvisories.push(...individualPackageAdvisories);
+			}
 		}
 
-		return results;
+		return securityAdvisories;
 	},
 };
