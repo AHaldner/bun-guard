@@ -104,7 +104,7 @@ Where `Scanner` follows Bun’s Security Scanner API (version `"1"`). See `src/t
 
 ## Changelog
 
-See `CHANGELOG.md` for release notes. Current version: `1.0.0`.
+See `CHANGELOG.md` for release notes.
 
 ## License
 
