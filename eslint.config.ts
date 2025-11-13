@@ -38,7 +38,7 @@ const config = [
 		},
 	},
 	{
-		ignores: ['node_modules/**', 'dist/**', '*.config.js', '*.config.ts', '__tests__/**'],
+		ignores: ['node_modules/**', 'dist/**', '__tests__/**'],
 	},
 ] as const;
 
