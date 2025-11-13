@@ -1,4 +1,4 @@
-name: Test
+name: Lint
 
 permissions:
   contents: read
@@ -10,7 +10,7 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  lint:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,5 +25,5 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Run tests
-        run: bun test
+      - name: Run lint
+        run: bun run lint

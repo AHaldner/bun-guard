@@ -17,7 +17,7 @@ export const validateSemverRange = (packages: Bun.Security.Package[]): Bun.Secur
 					description: `Resolved version ${resolvedVersion} does not satisfy requested range ${requestedVersionRange}`,
 				});
 			}
-		} catch (_semverError) {
+		} catch {
 			console.warn(
 				`Warning: Could not parse semver range "${requestedVersionRange}" for package "${packageInfo.name}". Skipping semver check.`,
 			);

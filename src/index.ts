@@ -15,7 +15,7 @@ export const scanner: Bun.Security.Scanner = {
 		try {
 			const packageAdvisories = await checkPackageVulnerabilities(packages);
 			securityAdvisories.push(...packageAdvisories);
-		} catch (_batchError) {
+		} catch {
 			for (const packageInfo of packages) {
 				const individualPackageVulnerabilities = await queryOSV(packageInfo);
 				if (individualPackageVulnerabilities.length === 0) continue;
