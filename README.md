@@ -1,115 +1,96 @@
-# 🛡️ Bun Guard — OSV‑Powered Security Scanner for Bun
+# 🛡️ Bun Guard
 
-`@tihn/bun-guard` is a security scanner for Bun’s package installation flow. It checks every package being installed against the Open Source Vulnerabilities (OSV) database and returns advisories that can stop or gate installations based on severity.
+Security scanner for Bun that checks packages against the [OSV vulnerability database](https://osv.dev) during installation.
 
-## Usage
-
-1. Install the scanner in your project:
+## Installation
 
 ```bash
 bun add -D @tihn/bun-guard
 ```
 
-2. Configure Bun to use the scanner in your `bunfig.toml`.
+## Configuration
+
+Add to your `bunfig.toml`:
 
 ```toml
 [install.security]
 scanner = "@tihn/bun-guard"
 ```
 
-Once configured, Bun will call the scanner’s exported `scanner` during `bun install`.
+That's it! The scanner will now run automatically during `bun install`.
 
 ## What It Does
 
-For each package (name + version) that Bun plans to install, Bun Guard:
+For each package during installation, Bun Guard:
 
-1. Validates that the resolved version satisfies its requested semver range (when provided) using `Bun.semver.satisfies`; mismatches are reported as fatal advisories.
-2. Queries OSV in batches (`https://api.osv.dev/v1/querybatch`) for known vulnerabilities, then fetches full details via `GET /v1/vulns`.
-3. Maps each finding to an advisory with a severity level.
-4. Returns all advisories to Bun to determine whether to continue.
+- ✅ **Validates semver ranges** — Ensures resolved versions match requested ranges
+- 🔍 **Queries OSV database** — Checks for known vulnerabilities via batch API
+- ⚡ **Evaluates severity** — Maps CVSS scores to fatal/warn levels
+- 🚨 **Reports advisories** — Returns security findings to Bun
 
-Advisories are always shown to the user. Fatal advisories stop installation immediately, while warnings may allow the user to continue depending on TTY and settings.
+### Severity Levels
 
-## Advisory Rules
+- **Fatal** (`level: 'fatal'`) — Stops installation
+  - OSV marks vulnerability as CRITICAL
+  - CVSS v3 has High impact (C:H, I:H, or A:H)
+  - Semver range mismatch
 
-- Fatal (`level: 'fatal'`)
-  - OSV marks a vulnerability as CRITICAL, or
-  - CVSS v3 impact indicates High for Confidentiality, Integrity, or Availability (C:H, I:H, or A:H)
+- **Warning** (`level: 'warn'`) — Allows installation to continue
+  - Other detected vulnerabilities
 
-- Warning (`level: 'warn'`)
-  - Any other detected vulnerability
+## API Usage
 
-Each advisory includes the package name, a description (summary/details), and a reference URL when available.
+The package exports a single scanner implementation:
 
-## Behavior and Failure Modes
+```typescript
+export const scanner: Bun.Security.Scanner
+```
 
-- Network: The scanner queries OSV over HTTPS. If the API call fails or returns a non‑OK status, Bun Guard returns an empty advisory list for the affected packages (installation proceeds).
-- Query strategy:
-  - Primary: `POST /v1/querybatch` for all name@version pairs.
-  - Enrichment: When batch results only include vulnerability IDs, resolve full records via `GET /v1/vulns?ids=...` (deduplicated and chunked).
-  - Fallback: If enrichment fails for a batch, fall back to `POST /v1/query` per package to preserve correctness.
-- Performance: Requests are chunked to keep payloads manageable. Batch + enrichment minimizes round‑trips while retaining full vulnerability details for severity evaluation.
+Implements Bun's [Security Scanner API](https://bun.com/docs/install/security-scanner-api) version `1`.
 
-## OSV Endpoints Used
+### OSV Endpoints Used
 
-- `POST https://api.osv.dev/v1/querybatch` — initial batch lookup by package and version.
-- `GET  https://api.osv.dev/v1/vulns?ids=...` — resolves full vulnerability details for returned IDs.
-- `POST https://api.osv.dev/v1/query` — per‑package fallback when enrichment cannot be resolved.
+- `POST /v1/querybatch` — Batch vulnerability lookup
+- `GET /v1/vulns?ids=...` — Detailed vulnerability information
+- `POST /v1/query` — Fallback for individual packages
 
 ## Development
 
-Build and type-check with Bun and TypeScript (configured via `tsconfig.json`).
-
-Run tests with:
+### Running Tests
 
 ```bash
 bun test
 ```
 
-Tests verify:
-
-- fatal detection for event-stream@3.3.6
-- handling of common benign packages
-- empty input behavior
-- semver mismatch handling
-- API failure handling
-
-
-To test locally using `bun link`:
+### Testing Locally
 
 ```bash
 # In this repo
 bun link
 
-# In a separate test project
+# In your test project
 bun link @tihn/bun-guard
 ```
 
-## API Surface
+### Linting
 
-This package exports a single named export:
-
-```ts
-export const scanner: Bun.Security.Scanner
+```bash
+bun run lint
+bun run lint:fix
 ```
 
-Where `Bun.Security.Scanner` follows Bun’s Security Scanner API (version `"1"`).
+## Contributing
 
-## Limitations
+Contributions welcome! Please open an issue or pull request on [GitHub](https://github.com/AHaldner/bun-guard).
 
-- OSV coverage: Advisories depend on OSV’s dataset. Not all risks (e.g., protestware, license issues) are represented.
-- No local caching: Queries are performed at install time without persistent caching.
-- Conservative failure handling: Network/API errors return no advisories rather than failing the install.
+## Useful Links
 
-## Changelog
-
-See `CHANGELOG.md` for release notes.
+- [OSV Database](https://osv.dev)
+- [OSV API Documentation](https://osv.dev/docs/)
+- [Bun Security Scanner API](https://bun.com/docs/install/security-scanner-api)
+- [Open an Issue](https://github.com/AHaldner/bun-guard/issues)
+- [Submit a Pull Request](https://github.com/AHaldner/bun-guard/pulls)
 
 ## License
 
-MIT © Andrin Haldner
-
-## Support
-
-- Bun Security Scanner API: <https://bun.com/docs/install/security-scanner-api>
-- Issues and contributions: open an issue or PR on this repository.
+MIT © [Andrin Haldner](https://github.com/AHaldner)
