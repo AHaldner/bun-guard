@@ -20,7 +20,7 @@ const fetchVulnDetailsByIds = async (ids: string[]): Promise<Map<string, OSVVuln
 			for (const vulnerability of vulnerabilityData.vulns || []) {
 				if (vulnerability?.id) vulnerabilityDetailsMap.set(vulnerability.id, vulnerability);
 			}
-		} catch (_err) {
+		} catch {
 			continue;
 		}
 	}
@@ -66,8 +66,8 @@ const queryOSVBatch = async (packages: Bun.Security.Package[]): Promise<OSVVulne
 
 			for (const queryResult of batchResponseData.results || []) {
 				const vulnerabilityIds = (queryResult.vulns || [])
-					.map((vulnerability: any) => (vulnerability as OSVVulnerability).id)
-					.filter((id: any): id is string => typeof id === 'string' && id.length > 0);
+					.map(vulnerability => (vulnerability as OSVVulnerability).id)
+					.filter((id): id is string => typeof id === 'string' && id.length > 0);
 				vulnerabilityIdsPerPackage.push(vulnerabilityIds);
 				allVulnerabilityIds.push(...vulnerabilityIds);
 			}
@@ -98,7 +98,7 @@ const queryOSVBatch = async (packages: Bun.Security.Package[]): Promise<OSVVulne
 
 				allResults.push(vulnerabilitiesForPackage);
 			}
-		} catch (_err) {
+		} catch {
 			for (let i = 0; i < packageChunk.length; i++) allResults.push([]);
 		}
 	}
@@ -130,7 +130,7 @@ const queryOSV = async (packageInfo: Bun.Security.Package): Promise<OSVVulnerabi
 
 		const vulnerabilityResponse = (await response.json()) as OSVResponse;
 		return vulnerabilityResponse.vulns || [];
-	} catch (error) {
+	} catch {
 		return [];
 	}
 };
