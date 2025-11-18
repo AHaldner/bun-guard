@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2025-11-18
+
+### Fixed
+
+- Ensure the scanner returns unique advisories so Bun doesn’t show duplicates
+- Fix OSV client to fetch vulnerability details by ID using the correct endpoint and align batch response types with the OSV API
+
 ## [1.2.0] - 2025-11-14
 
 ### Added
@@ -47,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhance security advisory structure with detailed vulnerability information
 - Severity mapping (CRITICAL → fatal, others → warn)
 
+[1.2.1]: https://github.com/AHaldner/bun-guard/releases/tag/v1.2.1
 [1.2.0]: https://github.com/AHaldner/bun-guard/releases/tag/v1.2.0
 [1.1.0]: https://github.com/AHaldner/bun-guard/releases/tag/v1.1.0
 [1.0.0]: https://github.com/AHaldner/bun-guard/releases/tag/v1.0.0
