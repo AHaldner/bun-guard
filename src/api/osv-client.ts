@@ -4,24 +4,28 @@ const fetchVulnDetailsByIds = async (ids: string[]): Promise<Map<string, OSVVuln
 	const vulnerabilityDetailsMap = new Map<string, OSVVulnerability>();
 	if (ids.length === 0) return vulnerabilityDetailsMap;
 
-	const ID_BATCH_SIZE = 100;
-	for (let i = 0; i < ids.length; i += ID_BATCH_SIZE) {
-		const vulnerabilityIdsBatch = ids.slice(i, i + ID_BATCH_SIZE);
-		const queryString = vulnerabilityIdsBatch.map(id => `ids=${encodeURIComponent(id)}`).join('&');
-
+	const fetchPromises = ids.map(async id => {
 		try {
-			const response = await fetch(`https://api.osv.dev/v1/vulns?${queryString}`, {
+			const response = await fetch(`https://api.osv.dev/v1/vulns/${encodeURIComponent(id)}`, {
 				method: 'GET',
 			});
 
-			if (!response.ok) continue;
-			const vulnerabilityData = (await response.json()) as OSVResponse;
-
-			for (const vulnerability of vulnerabilityData.vulns || []) {
-				if (vulnerability?.id) vulnerabilityDetailsMap.set(vulnerability.id, vulnerability);
+			if (!response.ok) {
+				return null;
 			}
+
+			const vulnerability = (await response.json()) as OSVVulnerability;
+			return vulnerability;
 		} catch {
-			continue;
+			return null;
+		}
+	});
+
+	const results = await Promise.all(fetchPromises);
+
+	for (const vulnerability of results) {
+		if (vulnerability?.id) {
+			vulnerabilityDetailsMap.set(vulnerability.id, vulnerability);
 		}
 	}
 
@@ -66,7 +70,7 @@ const queryOSVBatch = async (packages: Bun.Security.Package[]): Promise<OSVVulne
 
 			for (const queryResult of batchResponseData.results || []) {
 				const vulnerabilityIds = (queryResult.vulns || [])
-					.map(vulnerability => (vulnerability as OSVVulnerability).id)
+					.map(vulnerability => vulnerability.id)
 					.filter((id): id is string => typeof id === 'string' && id.length > 0);
 				vulnerabilityIdsPerPackage.push(vulnerabilityIds);
 				allVulnerabilityIds.push(...vulnerabilityIds);
@@ -93,7 +97,9 @@ const queryOSVBatch = async (packages: Bun.Security.Package[]): Promise<OSVVulne
 
 				for (const vulnerabilityId of vulnerabilityIds) {
 					const vulnerabilityDetails = vulnerabilityDetailsMap.get(vulnerabilityId);
-					if (vulnerabilityDetails) vulnerabilitiesForPackage.push(vulnerabilityDetails);
+					if (vulnerabilityDetails) {
+						vulnerabilitiesForPackage.push(vulnerabilityDetails);
+					}
 				}
 
 				allResults.push(vulnerabilitiesForPackage);
@@ -129,7 +135,9 @@ const queryOSV = async (packageInfo: Bun.Security.Package): Promise<OSVVulnerabi
 		}
 
 		const vulnerabilityResponse = (await response.json()) as OSVResponse;
-		return vulnerabilityResponse.vulns || [];
+		const vulnerabilities = vulnerabilityResponse.vulns || [];
+
+		return vulnerabilities;
 	} catch {
 		return [];
 	}

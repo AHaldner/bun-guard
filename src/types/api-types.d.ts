@@ -24,7 +24,7 @@ interface OSVBatchRequest {
 }
 
 interface OSVBatchResult {
-	vulns?: Array<Pick<OSVVulnerability, 'id'> | OSVVulnerability>;
+	vulns?: Array<Pick<OSVVulnerability, 'id' | 'modified'>>;
 }
 
 interface OSVBatchResponse {
