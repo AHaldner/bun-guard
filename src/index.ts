@@ -7,7 +7,9 @@ export const scanner: Bun.Security.Scanner = {
 	async scan({packages}) {
 		const securityAdvisories: Bun.Security.Advisory[] = [];
 
-		if (packages.length === 0) return securityAdvisories;
+		if (packages.length === 0) {
+			return securityAdvisories;
+		}
 
 		const semverAdvisories = validateSemverRange(packages);
 		securityAdvisories.push(...semverAdvisories);
@@ -28,6 +30,15 @@ export const scanner: Bun.Security.Scanner = {
 			}
 		}
 
-		return securityAdvisories;
+		const uniqueAdvisories = Array.from(
+			new Map(
+				securityAdvisories.map(advisory => [
+					`${advisory.package}:${advisory.url}:${advisory.description}`,
+					advisory,
+				]),
+			).values(),
+		);
+
+		return uniqueAdvisories;
 	},
 };
