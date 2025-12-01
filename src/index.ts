@@ -11,7 +11,7 @@ export const scanner: Bun.Security.Scanner = {
 			return securityAdvisories;
 		}
 
-		const semverAdvisories = validateSemverRange(packages);
+		const semverAdvisories = await validateSemverRange(packages);
 		securityAdvisories.push(...semverAdvisories);
 
 		try {

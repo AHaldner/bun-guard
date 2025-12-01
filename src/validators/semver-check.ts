@@ -1,5 +1,9 @@
-export const validateSemverRange = (packages: Bun.Security.Package[]): Bun.Security.Advisory[] => {
+export const validateSemverRange = async (
+	packages: Bun.Security.Package[],
+): Promise<Bun.Security.Advisory[]> => {
 	const advisoryResults: Bun.Security.Advisory[] = [];
+
+	const overriddenPackages = await getOverriddenPackages();
 
 	for (const packageInfo of packages) {
 		const resolvedVersion = packageInfo?.version;
@@ -10,11 +14,16 @@ export const validateSemverRange = (packages: Bun.Security.Package[]): Bun.Secur
 		try {
 			const satisfiesRequestedRange = Bun.semver.satisfies(resolvedVersion, requestedVersionRange);
 			if (!satisfiesRequestedRange) {
+				const isOverridden = overriddenPackages.has(packageInfo.name);
+				const level = isOverridden ? 'warn' : 'fatal';
+
 				advisoryResults.push({
-					level: 'fatal',
+					level,
 					package: packageInfo.name,
 					url: null,
-					description: `Resolved version ${resolvedVersion} does not satisfy requested range ${requestedVersionRange}`,
+					description: `Resolved version ${resolvedVersion} does not satisfy requested range ${requestedVersionRange}${
+						isOverridden ? ' (allowed via overrides/resolutions)' : ''
+					}`,
 				});
 			}
 		} catch {
@@ -25,4 +34,16 @@ export const validateSemverRange = (packages: Bun.Security.Package[]): Bun.Secur
 	}
 
 	return advisoryResults;
+};
+
+const getOverriddenPackages = async (): Promise<Set<string>> => {
+	try {
+		const packageJson = await Bun.file('package.json').json();
+		const overrides = packageJson.overrides || {};
+		const resolutions = packageJson.resolutions || {};
+
+		return new Set([...Object.keys(overrides), ...Object.keys(resolutions)]);
+	} catch {
+		return new Set();
+	}
 };
