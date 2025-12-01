@@ -1,2 +1,5 @@
+# Dependencies
 node_modules
+
+# MacOS system files
 .DS_Store
