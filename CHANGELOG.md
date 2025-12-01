@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- Downgrade semver mismatch advisory level from `fatal` to `warn` if the package is explicitly defined in `overrides` or `resolutions` in `package.json`
+
 ## [1.2.1] - 2025-11-18
 
 ### Fixed
