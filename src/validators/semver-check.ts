@@ -38,7 +38,7 @@ export const validateSemverRange = async (
 
 const getOverriddenPackages = async (): Promise<Set<string>> => {
 	try {
-		const packageJson = await Bun.file('package.json').json();
+		const packageJson = (await Bun.file('package.json').json()) as PackageJson;
 		const overrides = packageJson.overrides || {};
 		const resolutions = packageJson.resolutions || {};
 

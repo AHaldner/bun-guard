@@ -30,3 +30,11 @@ interface OSVBatchResult {
 interface OSVBatchResponse {
 	results: OSVBatchResult[];
 }
+
+interface PackageJson {
+	name?: string;
+	version?: string;
+	overrides?: Record<string, unknown>;
+	resolutions?: Record<string, unknown>;
+	[key: string]: unknown;
+}
