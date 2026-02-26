@@ -73,6 +73,25 @@ const fetchVulnDetailsByIds = async (ids: string[]): Promise<Map<string, OSVVuln
 	return vulnerabilityDetailsMap;
 };
 
+const mergeVulnerabilities = (
+	primaryVulnerabilities: OSVVulnerability[],
+	secondaryVulnerabilities: OSVVulnerability[],
+): OSVVulnerability[] => {
+	const mergedById = new Map<string, OSVVulnerability>();
+
+	for (const vulnerability of primaryVulnerabilities) {
+		mergedById.set(vulnerability.id, vulnerability);
+	}
+
+	for (const vulnerability of secondaryVulnerabilities) {
+		if (!mergedById.has(vulnerability.id)) {
+			mergedById.set(vulnerability.id, vulnerability);
+		}
+	}
+
+	return [...mergedById.values()];
+};
+
 const resolveVulnerabilityDetails = async (
 	vulnerabilityRefs: VulnerabilityRef[],
 ): Promise<Map<string, OSVVulnerability>> => {
@@ -203,19 +222,24 @@ const queryOSVBatch = async (packages: Bun.Security.Package[]): Promise<OSVVulne
 					.map(vulnerabilityRef => resolvedVulnerabilityDetails.get(vulnerabilityRef.id))
 					.filter((vulnerability): vulnerability is OSVVulnerability => Boolean(vulnerability));
 
-				if (resolvedVulnerabilities.length === vulnerabilityRefs.length) {
-					for (const resultIndex of resultIndexes) {
-						allResults[resultIndex] = resolvedVulnerabilities;
+					if (resolvedVulnerabilities.length === vulnerabilityRefs.length) {
+						for (const resultIndex of resultIndexes) {
+							allResults[resultIndex] = resolvedVulnerabilities;
+						}
+						continue;
 					}
-					continue;
-				}
 
-				const fallbackVulnerabilities = await queryOSV(packageInfo);
-				for (const resultIndex of resultIndexes) {
-					allResults[resultIndex] = fallbackVulnerabilities;
+					const fallbackVulnerabilities = await queryOSV(packageInfo);
+					const vulnerabilitiesToReport =
+						fallbackVulnerabilities.length === 0
+							? resolvedVulnerabilities
+							: mergeVulnerabilities(resolvedVulnerabilities, fallbackVulnerabilities);
+
+					for (const resultIndex of resultIndexes) {
+						allResults[resultIndex] = vulnerabilitiesToReport;
+					}
 				}
-			}
-		} catch {
+			} catch {
 			// Leave empty result slots on batch failures.
 		}
 	});
