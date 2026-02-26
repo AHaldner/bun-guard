@@ -8,11 +8,12 @@ interface OSVQuery {
 
 interface OSVVulnerability {
 	id: string;
-	summary: string;
-	details: string;
-	severity?: Array<{type: string; score: string}>;
-	database_specific?: {severity?: string};
-	references?: Array<{type: string; url: string}>;
+	summary?: string;
+	details?: string;
+	modified?: string;
+	severity?: Array<{ type: string; score: string }>;
+	database_specific?: { severity?: string };
+	references?: Array<{ type: string; url: string }>;
 }
 
 interface OSVResponse {
@@ -24,7 +25,7 @@ interface OSVBatchRequest {
 }
 
 interface OSVBatchResult {
-	vulns?: Array<Pick<OSVVulnerability, 'id' | 'modified'>>;
+	vulns?: OSVVulnerability[];
 }
 
 interface OSVBatchResponse {

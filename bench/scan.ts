@@ -1,4 +1,4 @@
-import {scanner} from '../src/index';
+import { scanner } from 'src';
 
 type ScenarioName = 'small' | 'medium' | 'large' | 'duplicate-heavy';
 
@@ -23,54 +23,55 @@ type BenchmarkOptions = {
 	scenario: ScenarioName;
 	iterations: number;
 	warmup: number;
+	count: number | null;
 };
 
 const PACKAGE_FIXTURES: PackageFixture[] = [
-	{name: 'react', version: '18.2.0'},
-	{name: 'react-dom', version: '18.2.0'},
-	{name: 'next', version: '14.2.0'},
-	{name: 'vue', version: '3.4.21'},
-	{name: 'svelte', version: '4.2.15'},
-	{name: 'typescript', version: '5.9.2'},
-	{name: 'eslint', version: '9.14.0'},
-	{name: 'prettier', version: '3.4.2'},
-	{name: 'lodash', version: '4.17.21'},
-	{name: 'axios', version: '1.7.9'},
-	{name: 'express', version: '4.21.1'},
-	{name: 'zod', version: '3.23.8'},
-	{name: 'date-fns', version: '4.1.0'},
-	{name: 'rxjs', version: '7.8.1'},
-	{name: 'chalk', version: '5.3.0'},
-	{name: 'commander', version: '12.1.0'},
-	{name: 'dotenv', version: '16.4.5'},
-	{name: 'uuid', version: '11.0.3'},
-	{name: 'ws', version: '8.18.0'},
-	{name: 'debug', version: '4.3.7'},
-	{name: 'minimist', version: '1.2.8'},
-	{name: 'yargs', version: '17.7.2'},
-	{name: 'tslib', version: '2.8.1'},
-	{name: 'nanoid', version: '5.0.7'},
-	{name: 'ms', version: '2.1.3'},
-	{name: 'glob', version: '11.0.0'},
-	{name: 'semver', version: '7.6.3'},
-	{name: 'vite', version: '5.4.10'},
-	{name: 'tailwindcss', version: '3.4.14'},
-	{name: 'pinia', version: '2.2.6'},
-	{name: 'mobx', version: '6.13.5'},
-	{name: 'redux', version: '5.0.1'},
-	{name: 'graphql', version: '16.9.0'},
-	{name: 'prisma', version: '5.22.0'},
-	{name: 'typeorm', version: '0.3.20'},
-	{name: 'mongoose', version: '8.8.0'},
-	{name: 'three', version: '0.170.0'},
-	{name: 'd3', version: '7.9.0'},
-	{name: 'vitest', version: '2.1.5'},
-	{name: 'cypress', version: '13.15.0'},
-	{name: 'playwright', version: '1.48.2'},
-	{name: 'pino', version: '9.5.0'},
-	{name: 'winston', version: '3.16.0'},
-	{name: 'event-stream', version: '3.3.6'},
-	{name: 'serialize-javascript', version: '3.1.0'},
+	{ name: 'react', version: '18.2.0' },
+	{ name: 'react-dom', version: '18.2.0' },
+	{ name: 'next', version: '14.2.0' },
+	{ name: 'vue', version: '3.4.21' },
+	{ name: 'svelte', version: '4.2.15' },
+	{ name: 'typescript', version: '5.9.2' },
+	{ name: 'eslint', version: '9.14.0' },
+	{ name: 'prettier', version: '3.4.2' },
+	{ name: 'lodash', version: '4.17.21' },
+	{ name: 'axios', version: '1.7.9' },
+	{ name: 'express', version: '4.21.1' },
+	{ name: 'zod', version: '3.23.8' },
+	{ name: 'date-fns', version: '4.1.0' },
+	{ name: 'rxjs', version: '7.8.1' },
+	{ name: 'chalk', version: '5.3.0' },
+	{ name: 'commander', version: '12.1.0' },
+	{ name: 'dotenv', version: '16.4.5' },
+	{ name: 'uuid', version: '11.0.3' },
+	{ name: 'ws', version: '8.18.0' },
+	{ name: 'debug', version: '4.3.7' },
+	{ name: 'minimist', version: '1.2.8' },
+	{ name: 'yargs', version: '17.7.2' },
+	{ name: 'tslib', version: '2.8.1' },
+	{ name: 'nanoid', version: '5.0.7' },
+	{ name: 'ms', version: '2.1.3' },
+	{ name: 'glob', version: '11.0.0' },
+	{ name: 'semver', version: '7.6.3' },
+	{ name: 'vite', version: '5.4.10' },
+	{ name: 'tailwindcss', version: '3.4.14' },
+	{ name: 'pinia', version: '2.2.6' },
+	{ name: 'mobx', version: '6.13.5' },
+	{ name: 'redux', version: '5.0.1' },
+	{ name: 'graphql', version: '16.9.0' },
+	{ name: 'prisma', version: '5.22.0' },
+	{ name: 'typeorm', version: '0.3.20' },
+	{ name: 'mongoose', version: '8.8.0' },
+	{ name: 'three', version: '0.170.0' },
+	{ name: 'd3', version: '7.9.0' },
+	{ name: 'vitest', version: '2.1.5' },
+	{ name: 'cypress', version: '13.15.0' },
+	{ name: 'playwright', version: '1.48.2' },
+	{ name: 'pino', version: '9.5.0' },
+	{ name: 'winston', version: '3.16.0' },
+	{ name: 'event-stream', version: '3.3.6' },
+	{ name: 'serialize-javascript', version: '3.1.0' },
 ];
 
 const parseOptions = (argv: string[]): BenchmarkOptions => {
@@ -78,6 +79,7 @@ const parseOptions = (argv: string[]): BenchmarkOptions => {
 		scenario: 'medium',
 		iterations: 5,
 		warmup: 1,
+		count: null,
 	};
 
 	for (const arg of argv) {
@@ -99,6 +101,13 @@ const parseOptions = (argv: string[]): BenchmarkOptions => {
 			const value = Number(arg.replace('--warmup=', ''));
 			if (Number.isInteger(value) && value >= 0) {
 				options.warmup = value;
+			}
+		}
+
+		if (arg.startsWith('--count=')) {
+			const value = Number(arg.replace('--count=', ''));
+			if (Number.isInteger(value) && value > 0) {
+				options.count = value;
 			}
 		}
 	}
@@ -129,6 +138,20 @@ const buildScenario = (scenario: ScenarioName): Bun.Security.Package[] => {
 	if (scenario === 'medium') return PACKAGE_FIXTURES.slice(0, 35).map(fixtureToPackage);
 	if (scenario === 'large') return PACKAGE_FIXTURES.map(fixtureToPackage);
 	return repeatPackages(PACKAGE_FIXTURES.slice(0, 15).map(fixtureToPackage), 10);
+};
+
+const buildCustomCountPackages = (count: number): Bun.Security.Package[] => {
+	const basePackages = PACKAGE_FIXTURES.map(fixtureToPackage);
+	if (count <= basePackages.length) return basePackages.slice(0, count);
+
+	const result: Bun.Security.Package[] = [];
+	for (let i = 0; i < count; i++) {
+		const packageInfo = basePackages[i % basePackages.length];
+		if (!packageInfo) continue;
+		result.push(packageInfo);
+	}
+
+	return result;
 };
 
 const normalizeEndpoint = (input: string | URL | Request): string => {
@@ -165,7 +188,7 @@ const runScanOnce = async (packages: Bun.Security.Package[]): Promise<RunResult>
 				existing.count += 1;
 				existing.totalMs += elapsedMs;
 			} else {
-				endpointStats.set(endpoint, {count: 1, totalMs: elapsedMs});
+				endpointStats.set(endpoint, { count: 1, totalMs: elapsedMs });
 			}
 
 			requestCount += 1;
@@ -178,7 +201,7 @@ const runScanOnce = async (packages: Bun.Security.Package[]): Promise<RunResult>
 	const startedAt = performance.now();
 
 	try {
-		const advisories = await scanner.scan({packages});
+		const advisories = await scanner.scan({ packages });
 
 		return {
 			durationMs: performance.now() - startedAt,
@@ -210,12 +233,14 @@ const formatMs = (value: number): string => `${value.toFixed(2)}ms`;
 
 const main = async (): Promise<void> => {
 	const options = parseOptions(Bun.argv.slice(2));
-	const packages = buildScenario(options.scenario);
+	const packages = options.count
+		? buildCustomCountPackages(options.count)
+		: buildScenario(options.scenario);
 	const uniquePackageKeys = new Set(
 		packages.map(packageInfo => `${packageInfo.name}@${packageInfo.version}`),
 	);
 
-	console.log(`Scenario: ${options.scenario}`);
+	console.log(`Scenario: ${options.count ? `custom(${options.count})` : options.scenario}`);
 	console.log(`Packages: ${packages.length} total / ${uniquePackageKeys.size} unique`);
 	console.log(`Warmup: ${options.warmup}, Iterations: ${options.iterations}`);
 	console.log('');
@@ -261,7 +286,7 @@ const main = async (): Promise<void> => {
 				existing.count += endpointStat.count;
 				existing.totalMs += endpointStat.totalMs;
 			} else {
-				endpointTotals.set(endpoint, {...endpointStat});
+				endpointTotals.set(endpoint, { ...endpointStat });
 			}
 		}
 	}
