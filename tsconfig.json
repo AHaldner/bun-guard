@@ -21,7 +21,9 @@
 		"baseUrl": ".",
 		"paths": {
 			"@api/*": ["src/api/*"],
-			"@validators/*": ["src/validators/*"]
-		}
-	}
+			"@cache/*": ["src/cache/*"],
+			"@utils/*": ["src/utils/*"],
+			"@validators/*": ["src/validators/*"],
+		},
+	},
 }

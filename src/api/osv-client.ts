@@ -1,113 +1,250 @@
+import {
+	type VulnerabilityRef,
+	getCachedVulnerabilityDetails,
+	cacheVulnerabilityDetails,
+	persistVulnerabilityCache,
+} from '@cache/osv-vulnerability-cache';
+import { isValidVulnerability } from '@utils/helpers';
+
 const BATCH_SIZE = 100;
+const BATCH_QUERY_CONCURRENCY = 4;
+const VULN_DETAIL_CONCURRENCY = 12;
+const inFlightVulnerabilityRequests = new Map<string, Promise<OSVVulnerability | null>>();
 
-const fetchVulnDetailsByIds = async (ids: string[]): Promise<Map<string, OSVVulnerability>> => {
-	const vulnerabilityDetailsMap = new Map<string, OSVVulnerability>();
-	if (ids.length === 0) return vulnerabilityDetailsMap;
+const runWithConcurrency = async <T>(
+	items: T[],
+	concurrency: number,
+	worker: (item: T) => Promise<void>,
+): Promise<void> => {
+	if (items.length === 0) return;
 
-	const fetchPromises = ids.map(async id => {
+	let currentIndex = 0;
+	const workerCount = Math.min(concurrency, items.length);
+
+	const workers = Array.from({ length: workerCount }, async () => {
+		while (currentIndex < items.length) {
+			const itemIndex = currentIndex;
+			currentIndex += 1;
+			const item = items[itemIndex];
+			if (item === undefined) continue;
+			await worker(item);
+		}
+	});
+
+	await Promise.all(workers);
+};
+
+const fetchVulnerabilityById = async (id: string): Promise<OSVVulnerability | null> => {
+	const inFlightRequest = inFlightVulnerabilityRequests.get(id);
+	if (inFlightRequest) return inFlightRequest;
+
+	const requestPromise = (async () => {
 		try {
 			const response = await fetch(`https://api.osv.dev/v1/vulns/${encodeURIComponent(id)}`, {
 				method: 'GET',
 			});
 
-			if (!response.ok) {
-				return null;
-			}
+			if (!response.ok) return null;
 
 			const vulnerability = (await response.json()) as OSVVulnerability;
-			return vulnerability;
+			return isValidVulnerability(vulnerability) ? vulnerability : null;
 		} catch {
 			return null;
+		} finally {
+			inFlightVulnerabilityRequests.delete(id);
 		}
-	});
+	})();
 
-	const results = await Promise.all(fetchPromises);
+	inFlightVulnerabilityRequests.set(id, requestPromise);
+	return requestPromise;
+};
 
-	for (const vulnerability of results) {
+const fetchVulnDetailsByIds = async (ids: string[]): Promise<Map<string, OSVVulnerability>> => {
+	const vulnerabilityDetailsMap = new Map<string, OSVVulnerability>();
+	if (ids.length === 0) return vulnerabilityDetailsMap;
+
+	await runWithConcurrency(ids, VULN_DETAIL_CONCURRENCY, async id => {
+		const vulnerability = await fetchVulnerabilityById(id);
 		if (vulnerability?.id) {
 			vulnerabilityDetailsMap.set(vulnerability.id, vulnerability);
 		}
-	}
+	});
 
 	return vulnerabilityDetailsMap;
+};
+
+const mergeVulnerabilities = (
+	primaryVulnerabilities: OSVVulnerability[],
+	secondaryVulnerabilities: OSVVulnerability[],
+): OSVVulnerability[] => {
+	const mergedById = new Map<string, OSVVulnerability>();
+
+	for (const vulnerability of primaryVulnerabilities) {
+		mergedById.set(vulnerability.id, vulnerability);
+	}
+
+	for (const vulnerability of secondaryVulnerabilities) {
+		if (!mergedById.has(vulnerability.id)) {
+			mergedById.set(vulnerability.id, vulnerability);
+		}
+	}
+
+	return [...mergedById.values()];
+};
+
+const resolveVulnerabilityDetails = async (
+	vulnerabilityRefs: VulnerabilityRef[],
+): Promise<Map<string, OSVVulnerability>> => {
+	const resolvedVulnerabilityDetails = await getCachedVulnerabilityDetails(vulnerabilityRefs);
+	const modifiedById = new Map<string, string | undefined>();
+
+	for (const vulnerabilityRef of vulnerabilityRefs) {
+		if (!modifiedById.has(vulnerabilityRef.id)) {
+			modifiedById.set(vulnerabilityRef.id, vulnerabilityRef.modified);
+		}
+	}
+
+	const missingVulnerabilityIds: string[] = [];
+
+	for (const [id] of modifiedById) {
+		const existingVulnerability = resolvedVulnerabilityDetails.get(id);
+		if (existingVulnerability) {
+			continue;
+		}
+
+		missingVulnerabilityIds.push(id);
+	}
+
+	if (missingVulnerabilityIds.length === 0) {
+		return resolvedVulnerabilityDetails;
+	}
+
+	const fetchedVulnerabilityDetails = await fetchVulnDetailsByIds(missingVulnerabilityIds);
+	cacheVulnerabilityDetails(fetchedVulnerabilityDetails, vulnerabilityRefs);
+
+	for (const [id, vulnerability] of fetchedVulnerabilityDetails) {
+		resolvedVulnerabilityDetails.set(id, vulnerability);
+	}
+
+	return resolvedVulnerabilityDetails;
 };
 
 const queryOSVBatch = async (packages: Bun.Security.Package[]): Promise<OSVVulnerability[][]> => {
 	if (packages.length === 0) return [];
 
-	const packageChunks: Bun.Security.Package[][] = [];
+	const allResults: OSVVulnerability[][] = Array.from({ length: packages.length }, () => []);
+	const packageGroupsByKey = new Map<
+		string,
+		{
+			packageInfo: Bun.Security.Package;
+			resultIndexes: number[];
+		}
+	>();
 
-	for (let i = 0; i < packages.length; i += BATCH_SIZE) {
-		packageChunks.push(packages.slice(i, i + BATCH_SIZE));
+	for (let packageIndex = 0; packageIndex < packages.length; packageIndex++) {
+		const packageInfo = packages[packageIndex];
+		if (!packageInfo) continue;
+
+		const packageKey = `${packageInfo.name}@${packageInfo.version}`;
+		const existingGroup = packageGroupsByKey.get(packageKey);
+		if (existingGroup) {
+			existingGroup.resultIndexes.push(packageIndex);
+		} else {
+			packageGroupsByKey.set(packageKey, {
+				packageInfo,
+				resultIndexes: [packageIndex],
+			});
+		}
 	}
 
-	const allResults: OSVVulnerability[][] = [];
+	const packageGroups = [...packageGroupsByKey.values()];
+	const packageGroupChunks: Array<Array<{ packageInfo: Bun.Security.Package; resultIndexes: number[] }>> = [];
 
-	for (const packageChunk of packageChunks) {
+	for (let i = 0; i < packageGroups.length; i += BATCH_SIZE) {
+		packageGroupChunks.push(packageGroups.slice(i, i + BATCH_SIZE));
+	}
+
+	await runWithConcurrency(packageGroupChunks, BATCH_QUERY_CONCURRENCY, async packageGroupChunk => {
 		const batchRequestBody: OSVBatchRequest = {
-			queries: packageChunk.map((packageInfo: Bun.Security.Package) => ({
+			queries: packageGroupChunk.map(({ packageInfo }) => ({
 				version: packageInfo.version,
-				package: {name: packageInfo.name, ecosystem: 'npm'},
+				package: { name: packageInfo.name, ecosystem: 'npm' },
 			})),
 		};
 
 		try {
 			const response = await fetch('https://api.osv.dev/v1/querybatch', {
 				method: 'POST',
-				headers: {'Content-Type': 'application/json'},
+				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(batchRequestBody),
 			});
 
 			if (!response.ok) {
-				for (let i = 0; i < packageChunk.length; i++) allResults.push([]);
-				continue;
+				return;
 			}
 
 			const batchResponseData = (await response.json()) as OSVBatchResponse;
+			const batchResults = batchResponseData.results || [];
+			const vulnerabilityRefsPerPackage: VulnerabilityRef[][] = [];
+			const allVulnerabilityRefs: VulnerabilityRef[] = [];
 
-			const vulnerabilityIdsPerPackage: string[][] = [];
-			const allVulnerabilityIds: string[] = [];
+			for (let packageOffset = 0; packageOffset < packageGroupChunk.length; packageOffset++) {
+				const queryResult = batchResults[packageOffset];
+				const vulnerabilityRefs = (queryResult?.vulns || [])
+					.filter(
+						vulnerability => typeof vulnerability.id === 'string' && vulnerability.id.length > 0,
+					)
+					.map(vulnerability => ({
+						id: vulnerability.id,
+						modified: vulnerability.modified,
+					}));
 
-			for (const queryResult of batchResponseData.results || []) {
-				const vulnerabilityIds = (queryResult.vulns || [])
-					.map(vulnerability => vulnerability.id)
-					.filter((id): id is string => typeof id === 'string' && id.length > 0);
-				vulnerabilityIdsPerPackage.push(vulnerabilityIds);
-				allVulnerabilityIds.push(...vulnerabilityIds);
+				vulnerabilityRefsPerPackage.push(vulnerabilityRefs);
+				allVulnerabilityRefs.push(...vulnerabilityRefs);
 			}
 
-			const uniqueVulnerabilityIds = Array.from(new Set(allVulnerabilityIds));
-			const vulnerabilityDetailsMap = await fetchVulnDetailsByIds(uniqueVulnerabilityIds);
+			const resolvedVulnerabilityDetails = await resolveVulnerabilityDetails(allVulnerabilityRefs);
 
-			const anyIdsPresent = uniqueVulnerabilityIds.length > 0;
-			const resolvedCount = vulnerabilityDetailsMap.size;
-			const resolutionFailed = anyIdsPresent && resolvedCount === 0;
+			for (let packageOffset = 0; packageOffset < packageGroupChunk.length; packageOffset++) {
+				const packageGroup = packageGroupChunk[packageOffset];
+				if (!packageGroup) continue;
 
-			if (resolutionFailed) {
-				for (const packageInfo of packageChunk) {
-					const vulnerabilities = await queryOSV(packageInfo);
-					allResults.push(vulnerabilities || []);
+				const { packageInfo, resultIndexes } = packageGroup;
+				const vulnerabilityRefs = vulnerabilityRefsPerPackage[packageOffset] || [];
+				if (vulnerabilityRefs.length === 0) {
+					for (const resultIndex of resultIndexes) {
+						allResults[resultIndex] = [];
+					}
+					continue;
 				}
 
-				continue;
-			}
+				const resolvedVulnerabilities = vulnerabilityRefs
+					.map(vulnerabilityRef => resolvedVulnerabilityDetails.get(vulnerabilityRef.id))
+					.filter((vulnerability): vulnerability is OSVVulnerability => Boolean(vulnerability));
 
-			for (const vulnerabilityIds of vulnerabilityIdsPerPackage) {
-				const vulnerabilitiesForPackage: OSVVulnerability[] = [];
+					if (resolvedVulnerabilities.length === vulnerabilityRefs.length) {
+						for (const resultIndex of resultIndexes) {
+							allResults[resultIndex] = resolvedVulnerabilities;
+						}
+						continue;
+					}
 
-				for (const vulnerabilityId of vulnerabilityIds) {
-					const vulnerabilityDetails = vulnerabilityDetailsMap.get(vulnerabilityId);
-					if (vulnerabilityDetails) {
-						vulnerabilitiesForPackage.push(vulnerabilityDetails);
+					const fallbackVulnerabilities = await queryOSV(packageInfo);
+					const vulnerabilitiesToReport =
+						fallbackVulnerabilities.length === 0
+							? resolvedVulnerabilities
+							: mergeVulnerabilities(resolvedVulnerabilities, fallbackVulnerabilities);
+
+					for (const resultIndex of resultIndexes) {
+						allResults[resultIndex] = vulnerabilitiesToReport;
 					}
 				}
-
-				allResults.push(vulnerabilitiesForPackage);
-			}
-		} catch {
-			for (let i = 0; i < packageChunk.length; i++) allResults.push([]);
+			} catch {
+			// Leave empty result slots on batch failures.
 		}
-	}
+	});
+
+	await persistVulnerabilityCache();
 
 	return allResults;
 };
@@ -194,4 +331,4 @@ const listVulnerablePackages = (
 	return advisoryResults;
 };
 
-export {queryOSV, queryOSVBatch, listVulnerablePackages};
+export { queryOSV, queryOSVBatch, listVulnerablePackages };

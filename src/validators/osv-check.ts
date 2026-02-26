@@ -1,4 +1,4 @@
-import {listVulnerablePackages, queryOSVBatch} from '@api/osv-client';
+import { listVulnerablePackages, queryOSVBatch } from '@api/osv-client';
 
 export const checkPackageVulnerabilities = async (
 	packages: Bun.Security.Package[],

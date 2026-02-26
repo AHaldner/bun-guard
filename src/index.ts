@@ -1,10 +1,10 @@
-import {queryOSV, listVulnerablePackages} from '@api/osv-client';
-import {validateSemverRange} from '@validators/semver-check';
-import {checkPackageVulnerabilities} from '@validators/osv-check';
+import { queryOSV, listVulnerablePackages } from '@api/osv-client';
+import { validateSemverRange } from '@validators/semver-check';
+import { checkPackageVulnerabilities } from '@validators/osv-check';
 
 export const scanner: Bun.Security.Scanner = {
 	version: '1',
-	async scan({packages}) {
+	async scan({ packages }) {
 		const securityAdvisories: Bun.Security.Advisory[] = [];
 
 		if (packages.length === 0) {
