@@ -52,7 +52,7 @@ type CacheData = {
 	entries: Record<string, CacheEntryShape>;
 };
 
-const isValidCachedVulnerability = (value: unknown): value is CacheEntryShape => {
+export const isValidCachedVulnerability = (value: unknown): value is CacheEntryShape => {
 	if (!isRecord(value)) return false;
 
 	return (
@@ -65,7 +65,6 @@ const isValidCachedVulnerability = (value: unknown): value is CacheEntryShape =>
 
 export const isValidCacheData = (value: unknown): value is CacheData => {
 	if (!isRecord(value)) return false;
-	if (!isRecord(value.entries)) return false;
 
-	return Object.values(value.entries).every(isValidCachedVulnerability);
+	return isRecord(value.entries);
 };

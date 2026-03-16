@@ -268,8 +268,12 @@ const createMockBunFile = (content: string): ReturnType<typeof Bun.file> => {
 
 describe('Semver Override', () => {
 	const originalBunFile = Bun.file;
+	let originalCI: string | undefined;
 
 	beforeEach(() => {
+		originalCI = Bun.env.CI;
+		delete Bun.env.CI;
+
 		Bun.file = ((path: string) => {
 			if (path === 'package.json') {
 				return createMockBunFile(
@@ -285,6 +289,12 @@ describe('Semver Override', () => {
 
 	afterEach(() => {
 		Bun.file = originalBunFile;
+
+		if (typeof originalCI === 'string') {
+			Bun.env.CI = originalCI;
+		} else {
+			delete Bun.env.CI;
+		}
 	});
 
 	test('should produce warn when mismatched package is listed in overrides', async () => {
