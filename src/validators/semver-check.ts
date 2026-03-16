@@ -1,3 +1,5 @@
+import { isValidPackageJson } from '@utils/helpers';
+
 export const validateSemverRange = async (
 	packages: Bun.Security.Package[],
 ): Promise<Bun.Security.Advisory[]> => {
@@ -38,7 +40,11 @@ export const validateSemverRange = async (
 
 const getOverriddenPackages = async (): Promise<Set<string>> => {
 	try {
-		const packageJson = (await Bun.file('package.json').json()) as PackageJson;
+		const packageJson = await Bun.file('package.json').json();
+		if (!isValidPackageJson(packageJson)) {
+			return new Set();
+		}
+
 		const overrides = packageJson.overrides || {};
 		const resolutions = packageJson.resolutions || {};
 

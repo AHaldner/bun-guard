@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-03-16
+
+### Added
+
+- Automatically skip the security scan when a CI environment is detected (`CI=true`), since TTY access is required
+
+### Changed
+
+- Replace unsafe type assertions with runtime validation guards
+
 ## [1.3.0] - 2026-02-26
 
 ### Added
@@ -80,6 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhance security advisory structure with detailed vulnerability information
 - Severity mapping (CRITICAL → fatal, others → warn)
 
+[1.3.1]: https://github.com/AHaldner/bun-guard/releases/tag/v1.3.1
 [1.3.0]: https://github.com/AHaldner/bun-guard/releases/tag/v1.3.0
 [1.2.2]: https://github.com/AHaldner/bun-guard/releases/tag/v1.2.2
 [1.2.1]: https://github.com/AHaldner/bun-guard/releases/tag/v1.2.1

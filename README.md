@@ -27,6 +27,7 @@ For each package during installation, Bun Guard:
 - 🔍 **Queries OSV database** — Checks for known vulnerabilities via batch API
 - ⚡ **Evaluates severity** — Maps CVSS scores to fatal/warn levels
 - 🚨 **Reports advisories** — Returns security findings to Bun
+- 🤖 **Skips in CI environments** — Automatically detects `CI=true` and skips the scan, since TTY access is required
 
 ### Severity Levels
 
@@ -90,6 +91,10 @@ Contributions welcome! Please open an issue or pull request on [GitHub](https://
 - [Bun Security Scanner API](https://bun.com/docs/install/security-scanner-api)
 - [Open an Issue](https://github.com/AHaldner/bun-guard/issues)
 - [Submit a Pull Request](https://github.com/AHaldner/bun-guard/pulls)
+
+## Disclaimer
+
+This project is not affiliated with, endorsed by, or in any way officially connected to the Bun project. All product names, logos, and brands are property of their respective owners.
 
 ## License
 
