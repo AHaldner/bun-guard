@@ -237,6 +237,25 @@ describe('Security Scanner', () => {
 		expect(scanner.version).toBe('1');
 		expect(typeof scanner.scan).toBe('function');
 	});
+
+	test('should skip scan and return empty advisories when CI environment is detected', async () => {
+		const originalCI = Bun.env.CI;
+
+		try {
+			process.env.CI = 'true';
+
+			const packagesToScan = [createMockPackage('event-stream', '3.3.6')];
+			const scanResults = await scanner.scan({ packages: packagesToScan });
+
+			expect(scanResults).toEqual([]);
+		} finally {
+			if (typeof originalCI === 'string') {
+				process.env.CI = originalCI;
+			} else {
+				delete process.env.CI;
+			}
+		}
+	});
 });
 
 describe('Scanner Integration', () => {

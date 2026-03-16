@@ -7,6 +7,14 @@ export const scanner: Bun.Security.Scanner = {
 	async scan({ packages }) {
 		const securityAdvisories: Bun.Security.Advisory[] = [];
 
+		if (Bun.env.CI === 'true') {
+			console.warn(
+				'\x1b[33m[bun-guard] CI environment detected. Skipping security scan because TTY access is required.\x1b[0m',
+			);
+
+			return securityAdvisories;
+		}
+
 		if (packages.length === 0) {
 			return securityAdvisories;
 		}
