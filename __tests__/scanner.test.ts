@@ -1,4 +1,4 @@
-import { beforeAll, afterAll, describe, test, expect } from 'bun:test';
+import { beforeAll, afterAll, beforeEach, afterEach, describe, test, expect } from 'bun:test';
 import { scanner } from 'src';
 
 const createMockPackage = (name: string, version: string) => {
@@ -238,23 +238,105 @@ describe('Security Scanner', () => {
 		expect(typeof scanner.scan).toBe('function');
 	});
 
-	test('should skip scan and return empty advisories when CI environment is detected', async () => {
+	test.each([['true'], ['1']])('should skip scan when CI="%s" is detected', async ciValue => {
 		const originalCI = Bun.env.CI;
 
 		try {
-			process.env.CI = 'true';
+			Bun.env.CI = ciValue;
 
-			const packagesToScan = [createMockPackage('event-stream', '3.3.6')];
-			const scanResults = await scanner.scan({ packages: packagesToScan });
+			const scanResults = await scanner.scan({
+				packages: [createMockPackage('event-stream', '3.3.6')],
+			});
 
 			expect(scanResults).toEqual([]);
 		} finally {
 			if (typeof originalCI === 'string') {
-				process.env.CI = originalCI;
+				Bun.env.CI = originalCI;
 			} else {
-				delete process.env.CI;
+				delete Bun.env.CI;
 			}
 		}
+	});
+});
+
+const createMockBunFile = (content: string): ReturnType<typeof Bun.file> => {
+	return {
+		text: () => Promise.resolve(content),
+		json: () => Promise.resolve(JSON.parse(content)),
+	} as unknown as ReturnType<typeof Bun.file>;
+};
+
+describe('Semver Override', () => {
+	const originalBunFile = Bun.file;
+
+	beforeEach(() => {
+		Bun.file = ((path: string) => {
+			if (path === 'package.json') {
+				return createMockBunFile(
+					JSON.stringify({
+						overrides: { 'overridden-pkg': '1.0.0' },
+						resolutions: { 'resolved-pkg': '1.0.0' },
+					}),
+				);
+			}
+			return originalBunFile(path);
+		}) as typeof Bun.file;
+	});
+
+	afterEach(() => {
+		Bun.file = originalBunFile;
+	});
+
+	test('should produce warn when mismatched package is listed in overrides', async () => {
+		const pkg = createMockPackage('overridden-pkg', '1.0.0');
+		(pkg as any).requestedRange = '^2.0.0';
+
+		const scanResults = await scanner.scan({ packages: [pkg] });
+
+		const advisory = scanResults.find(r => r.package === 'overridden-pkg');
+		expect(advisory).toBeDefined();
+		expect(advisory!.level).toBe('warn');
+		expect(advisory!.description).toContain('allowed via overrides/resolutions');
+	});
+
+	test('should produce warn when mismatched package is listed in resolutions', async () => {
+		const pkg = createMockPackage('resolved-pkg', '1.0.0');
+		(pkg as any).requestedRange = '^2.0.0';
+
+		const scanResults = await scanner.scan({ packages: [pkg] });
+
+		const advisory = scanResults.find(r => r.package === 'resolved-pkg');
+		expect(advisory).toBeDefined();
+		expect(advisory!.level).toBe('warn');
+		expect(advisory!.description).toContain('allowed via overrides/resolutions');
+	});
+
+	test('should still produce fatal when mismatched package is not in overrides or resolutions', async () => {
+		const pkg = createMockPackage('non-overridden-pkg', '1.0.0');
+		(pkg as any).requestedRange = '^2.0.0';
+
+		const scanResults = await scanner.scan({ packages: [pkg] });
+
+		const advisory = scanResults.find(r => r.package === 'non-overridden-pkg');
+		expect(advisory).toBeDefined();
+		expect(advisory!.level).toBe('fatal');
+		expect(advisory!.description).not.toContain('allowed via overrides/resolutions');
+	});
+
+	test('should produce correct advisory level for each package independently', async () => {
+		const overriddenPkg = createMockPackage('overridden-pkg', '1.0.0');
+		(overriddenPkg as any).requestedRange = '^2.0.0';
+
+		const nonOverriddenPkg = createMockPackage('non-overridden-pkg', '1.0.0');
+		(nonOverriddenPkg as any).requestedRange = '^2.0.0';
+
+		const scanResults = await scanner.scan({ packages: [overriddenPkg, nonOverriddenPkg] });
+
+		const overriddenAdvisory = scanResults.find(r => r.package === 'overridden-pkg');
+		const nonOverriddenAdvisory = scanResults.find(r => r.package === 'non-overridden-pkg');
+
+		expect(overriddenAdvisory?.level).toBe('warn');
+		expect(nonOverriddenAdvisory?.level).toBe('fatal');
 	});
 });
 

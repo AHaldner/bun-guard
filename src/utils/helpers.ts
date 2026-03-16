@@ -12,6 +12,7 @@ const isValidVulnerabilityArray = (value: unknown): value is OSVVulnerability[] 
 
 export const isValidOSVResponse = (value: unknown): value is OSVResponse => {
 	if (!isRecord(value)) return false;
+	if (value.vulns === undefined) return true;
 
 	return isValidVulnerabilityArray(value.vulns);
 };
@@ -48,7 +49,7 @@ type CacheEntryShape = {
 };
 
 type CacheData = {
-	entries?: Record<string, CacheEntryShape>;
+	entries: Record<string, CacheEntryShape>;
 };
 
 const isValidCachedVulnerability = (value: unknown): value is CacheEntryShape => {
@@ -64,7 +65,6 @@ const isValidCachedVulnerability = (value: unknown): value is CacheEntryShape =>
 
 export const isValidCacheData = (value: unknown): value is CacheData => {
 	if (!isRecord(value)) return false;
-	if (value.entries === undefined) return true;
 	if (!isRecord(value.entries)) return false;
 
 	return Object.values(value.entries).every(isValidCachedVulnerability);
