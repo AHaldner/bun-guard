@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Automatically skip the security scan when a CI environment is detected (`CI=true`), since TTY access is required
 
+### Changed
+
+- Replace unsafe type assertions with runtime validation guards
+
 ## [1.3.0] - 2026-02-26
 
 ### Added
