@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Publish generated `dist` artifacts instead of shipping source, tests, benchmarks, workflows, and development config
 - Build the package with Bun's bundler API and TypeScript declaration output
 - Update GitHub Actions workflow actions to current major versions
+- Upgrade the project configuration for TypeScript 6 compatibility
 
 ## [1.3.1] - 2026-03-16
 
