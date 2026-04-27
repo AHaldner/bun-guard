@@ -1,13 +1,13 @@
 name: Publish
 
 permissions:
-  contents: write
   id-token: write
+  contents: write
 
 on:
   push:
     tags:
-      - "v[0-9]*.[0-9]*.[0-9]*"
+      - 'v[0-9]*.[0-9]*.[0-9]*'
 
 jobs:
   publish:
@@ -33,8 +33,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: "22"
-          registry-url: "https://registry.npmjs.org"
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -54,7 +54,7 @@ jobs:
 
       - name: Run tests
         env:
-          CI: "false"
+          CI: 'false'
         run: bun test
 
       - name: Build package
@@ -65,6 +65,23 @@ jobs:
 
       - name: Create release notes
         run: bun scripts/release-notes.ts "$GITHUB_REF_NAME" > release-notes.md
+
+      - name: Verify npm supports trusted publishing
+        shell: bash
+        run: |
+          NPM_VERSION="$(npm --version)"
+          NPM_VERSION="$NPM_VERSION" node -e '
+            const current = process.env.NPM_VERSION.split(".").map(Number);
+            const minimum = [11, 5, 1];
+            const ok = current.some((part, index) => part !== minimum[index])
+              ? current.find((part, index) => part !== minimum[index]) >
+                minimum[current.findIndex((part, index) => part !== minimum[index])]
+              : true;
+            if (!ok) {
+              console.error(`npm ${process.env.NPM_VERSION} does not support trusted publishing. Use npm >= 11.5.1.`);
+              process.exit(1);
+            }
+          '
 
       - name: Publish to npm
         run: npm publish --access public
