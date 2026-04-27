@@ -116,11 +116,11 @@ bun run lint:fix
 Publishing runs from GitHub Actions when a numeric semver tag is pushed:
 
 ```bash
-git tag 1.5.0
-git push origin 1.5.0
+git tag v1.5.0
+git push origin v1.5.0
 ```
 
-The tag must match `package.json`'s version exactly and must not include a leading `v`.
+The tag must match `package.json`'s version with a leading `v`.
 
 ## Contributing
 
