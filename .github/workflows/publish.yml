@@ -1,0 +1,66 @@
+name: Publish
+
+permissions:
+  contents: read
+  id-token: write
+
+on:
+  push:
+    tags:
+      - "[0-9]*.[0-9]*.[0-9]*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Validate release tag
+        shell: bash
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag must be numeric semver without a leading v, for example 1.5.0."
+            exit 1
+          fi
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Validate package version
+        shell: bash
+        run: |
+          PACKAGE_VERSION="$(bun -e "console.log(require('./package.json').version)")"
+          if [[ "$PACKAGE_VERSION" != "$GITHUB_REF_NAME" ]]; then
+            echo "package.json version $PACKAGE_VERSION does not match tag $GITHUB_REF_NAME."
+            exit 1
+          fi
+
+      - name: Run lint
+        run: bun run lint
+
+      - name: Run tests
+        env:
+          CI: "false"
+        run: bun test
+
+      - name: Build package
+        run: bun run build
+
+      - name: Verify package contents
+        run: bun run package:check
+
+      - name: Publish to npm
+        run: npm publish --access public

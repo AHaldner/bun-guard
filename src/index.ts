@@ -24,21 +24,26 @@ export const scanner: Bun.Security.Scanner = {
 		const semverAdvisories = await validateSemverRange(packages);
 		securityAdvisories.push(...semverAdvisories);
 
-		try {
-			const packageAdvisories = await checkPackageVulnerabilities(packages);
-			securityAdvisories.push(...packageAdvisories);
-		} catch {
-			for (const packageInfo of packages) {
-				const individualPackageVulnerabilities = await queryOSV(packageInfo);
-				if (individualPackageVulnerabilities.length === 0) continue;
-
-				const individualPackageAdvisories = listVulnerablePackages(
-					individualPackageVulnerabilities,
-					packageInfo.name,
+		await checkPackageVulnerabilities(packages)
+			.then(packageAdvisories => {
+				securityAdvisories.push(...packageAdvisories);
+			})
+			.catch(async () => {
+				logger.error(
+					'Batch vulnerability scan failed. Falling back to individual package queries.',
 				);
-				securityAdvisories.push(...individualPackageAdvisories);
-			}
-		}
+
+				for (const packageInfo of packages) {
+					const individualPackageVulnerabilities = await queryOSV(packageInfo);
+					if (individualPackageVulnerabilities.length === 0) continue;
+
+					const individualPackageAdvisories = listVulnerablePackages(
+						individualPackageVulnerabilities,
+						packageInfo.name,
+					);
+					securityAdvisories.push(...individualPackageAdvisories);
+				}
+			});
 
 		const uniqueAdvisories = Array.from(
 			new Map(

@@ -63,6 +63,37 @@ Implements Bun's [Security Scanner API](https://bun.com/docs/install/security-sc
 bun test
 ```
 
+### Building
+
+```bash
+bun run build
+```
+
+The npm package publishes the generated `dist` files plus package metadata, license, readme, and changelog.
+
+### Checking Package Contents
+
+```bash
+bun run package:check
+```
+
+This verifies that the package tarball excludes source, tests, benchmarks, workflows, and development config.
+
+### Local Tarball Smoke Test
+
+```bash
+bun run build
+TARBALL="$(npm_config_cache=/tmp/bun-guard-npm-cache npm pack --silent)"
+TARBALL_PATH="$(pwd)/$TARBALL"
+
+mkdir -p /tmp/bun-guard-smoke
+cd /tmp/bun-guard-smoke
+bun init -y
+bun add -d "$TARBALL_PATH"
+printf '[install.security]\nscanner = "@tihn/bun-guard"\n' > bunfig.toml
+bun install
+```
+
 ### Testing Locally
 
 ```bash
@@ -79,6 +110,17 @@ bun link @tihn/bun-guard
 bun run lint
 bun run lint:fix
 ```
+
+### Publishing
+
+Publishing runs from GitHub Actions when a numeric semver tag is pushed:
+
+```bash
+git tag 1.5.0
+git push origin 1.5.0
+```
+
+The tag must match `package.json`'s version exactly and must not include a leading `v`.
 
 ## Contributing
 
