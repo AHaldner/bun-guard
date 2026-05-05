@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-05-05
+
+### Fixed
+
+- Fall back to individual OSV package queries when batch requests fail, return invalid payloads, or return truncated result sets
+- Preserve vulnerability IDs from successful batch responses when detail hydration fails
+- Skip scanner runs in non-CI, non-TTY installs where Bun security scanners cannot prompt safely
+- Add timeout handling for OSV requests and warn when results may be incomplete
+- Treat local OSV cache entries as untrusted metadata by validating cached advisory content and ignoring cached severity for blocking decisions
+- Ensure OSV cache writes create the cache directory on fresh machines
+- Require release tags to point at commits reachable from `main`
+
+### Changed
+
+- Run batch fallback per failed chunk, preserve successful batch chunks, deduplicate fallback package keys, and bound fallback query concurrency
+- Reduce semver validation overhead by checking ranges synchronously and reading overrides/resolutions only when mismatches need classification
+- Split scanner tests into focused scanner, OSV client, cache, semver, and workflow test files
+- Replace ESLint and Prettier with type-aware Oxc linting and Oxfmt formatting
+- Replace the custom Bun/TypeScript build script with `tsdown`
+- Pin release workflow build actions and Bun setup to reviewed versions
+
 ## [1.4.0] - 2026-04-27
 
 ### Added
@@ -105,6 +126,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhance security advisory structure with detailed vulnerability information
 - Severity mapping (CRITICAL → fatal, others → warn)
 
+[1.4.1]: https://github.com/AHaldner/bun-guard/releases/tag/v1.4.1
 [1.4.0]: https://github.com/AHaldner/bun-guard/releases/tag/v1.4.0
 [1.3.1]: https://github.com/AHaldner/bun-guard/releases/tag/v1.3.1
 [1.3.0]: https://github.com/AHaldner/bun-guard/releases/tag/v1.3.0

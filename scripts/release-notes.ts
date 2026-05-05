@@ -6,7 +6,9 @@ const normalizeVersion = (rawVersion: string) =>
 export const formatReleaseNotes = (changelog: string, rawVersion: string) => {
 	const version = normalizeVersion(rawVersion);
 	const lines = changelog.split(/\r?\n/);
-	const releaseHeadingPattern = new RegExp(`^## \\[${version.replaceAll('.', '\\.')}\\](?: - .+)?$`);
+	const releaseHeadingPattern = new RegExp(
+		`^## \\[${version.replaceAll('.', '\\.')}\\](?: - .+)?$`,
+	);
 
 	let isCollectingReleaseNotes = false;
 	const releaseNotes: string[] = [];

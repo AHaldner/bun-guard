@@ -1,4 +1,5 @@
 import { queryOSV, listVulnerablePackages } from '@api/osv-client';
+import { shouldSkipScan } from '@utils/helpers';
 import { logger } from '@utils/logger';
 import { validateSemverRange } from '@validators/semver-check';
 import { checkPackageVulnerabilities } from '@validators/osv-check';
@@ -7,12 +8,9 @@ export const scanner: Bun.Security.Scanner = {
 	version: '1',
 	async scan({ packages }) {
 		const securityAdvisories: Bun.Security.Advisory[] = [];
-		const ciValue = Bun.env.CI;
 
-		if (ciValue === 'true' || ciValue === '1') {
-			logger.warn(
-				'CI environment detected. Skipping security scan because TTY access is required.',
-			);
+		if (shouldSkipScan()) {
+			logger.warn('Skipping security scan because TTY access is required.');
 
 			return securityAdvisories;
 		}

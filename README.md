@@ -1,138 +1,62 @@
 # 🛡️ Bun Guard
 
-Security scanner for Bun that checks packages against the [OSV vulnerability database](https://osv.dev) during installation.
+Security scanner for Bun installs. Bun Guard checks resolved npm packages against the [OSV vulnerability database](https://osv.dev) and reports advisories through Bun's Security Scanner API.
 
-## Installation
+## Setup
 
 ```bash
 bun add -D @tihn/bun-guard
 ```
 
-## Configuration
-
-Add to your `bunfig.toml`:
+Add the scanner to `bunfig.toml`:
 
 ```toml
 [install.security]
 scanner = "@tihn/bun-guard"
 ```
 
-That's it! The scanner will now run automatically during `bun install`.
+Bun Guard now runs during `bun install`.
 
-## What It Does
+## What It Checks
 
-For each package during installation, Bun Guard:
+- 🚨 **Known vulnerabilities:** queries OSV with Bun's resolved package names and versions.
+- 📦 **Semver mismatches:** warns when the resolved version does not satisfy the requested range.
+- 🧭 **Override intent:** downgrades semver mismatch failures to warnings when the package is explicitly listed in `overrides` or `resolutions`.
+- ⚡ **Severity:** treats OSV `CRITICAL` advisories and high-impact CVSS v3 advisories as fatal.
 
-- ✅ **Validates semver ranges** — Ensures resolved versions match requested ranges
-- 🔍 **Queries OSV database** — Checks for known vulnerabilities via batch API
-- ⚡ **Evaluates severity** — Maps CVSS scores to fatal/warn levels
-- 🚨 **Reports advisories** — Returns security findings to Bun
-- 🤖 **Skips in CI environments** — Automatically detects `CI=true` and skips the scan, since TTY access is required
+The scanner uses OSV's batch API first, falls back to individual package queries when needed, and caches vulnerability details locally to reduce repeated OSV requests.
 
-### Severity Levels
+## Advisory Levels
 
-- **Fatal** (`level: 'fatal'`) — Stops installation
-  - OSV marks vulnerability as CRITICAL
-  - CVSS v3 has High impact (C:H, I:H, or A:H)
-  - Semver range mismatch
+- `fatal`: stops installation for critical/high-impact vulnerabilities or unexpected semver resolutions.
+- `warn`: allows installation to continue for lower-severity advisories or intentional overrides/resolutions.
 
-- **Warning** (`level: 'warn'`) — Allows installation to continue
-  - Other detected vulnerabilities
+## Runtime Notes
 
-## API Usage
+- Bun security scanners require TTY access, so Bun Guard skips scans in CI and non-TTY installs.
+- OSV requests have a timeout budget. If OSV is slow or unavailable, Bun Guard warns and falls back where possible.
+- Local cache data is treated as untrusted optimization data; fresh OSV responses decide blocking severity.
 
-The package exports a single scanner implementation:
+## API
 
 ```typescript
-export const scanner: Bun.Security.Scanner
+export const scanner: Bun.Security.Scanner;
 ```
 
-Implements Bun's [Security Scanner API](https://bun.com/docs/install/security-scanner-api) version `1`.
-
-### OSV Endpoints Used
-
-- `POST /v1/querybatch` — Batch vulnerability lookup
-- `GET /v1/vulns?ids=...` — Detailed vulnerability information
-- `POST /v1/query` — Fallback for individual packages
+Bun Guard implements Bun's [Security Scanner API](https://bun.com/docs/install/security-scanner-api) version `1`.
 
 ## Development
 
-### Running Tests
-
 ```bash
+bun install
 bun test
-```
-
-### Building
-
-```bash
+bun run lint
+bun run format:check
 bun run build
-```
-
-The npm package publishes the generated `dist` files plus package metadata, license, readme, and changelog.
-
-### Checking Package Contents
-
-```bash
 bun run package:check
 ```
 
-This verifies that the package tarball excludes source, tests, benchmarks, workflows, and development config.
-
-### Local Tarball Smoke Test
-
-```bash
-bun run build
-TARBALL="$(npm_config_cache=/tmp/bun-guard-npm-cache npm pack --silent)"
-TARBALL_PATH="$(pwd)/$TARBALL"
-
-mkdir -p /tmp/bun-guard-smoke
-cd /tmp/bun-guard-smoke
-bun init -y
-bun add -d "$TARBALL_PATH"
-printf '[install.security]\nscanner = "@tihn/bun-guard"\n' > bunfig.toml
-bun install
-```
-
-### Testing Locally
-
-```bash
-# In this repo
-bun link
-
-# In your test project
-bun link @tihn/bun-guard
-```
-
-### Linting
-
-```bash
-bun run lint
-bun run lint:fix
-```
-
-### Publishing
-
-Publishing runs from GitHub Actions when a numeric semver tag is pushed:
-
-```bash
-git tag v1.5.0
-git push origin v1.5.0
-```
-
-The tag must match `package.json`'s version with a leading `v`.
-
-## Contributing
-
-Contributions welcome! Please open an issue or pull request on [GitHub](https://github.com/AHaldner/bun-guard).
-
-## Useful Links
-
-- [OSV Database](https://osv.dev)
-- [OSV API Documentation](https://osv.dev/docs/)
-- [Bun Security Scanner API](https://bun.com/docs/install/security-scanner-api)
-- [Open an Issue](https://github.com/AHaldner/bun-guard/issues)
-- [Submit a Pull Request](https://github.com/AHaldner/bun-guard/pulls)
+The npm package publishes only `dist`, package metadata, license, readme, and changelog.
 
 ## Disclaimer
 

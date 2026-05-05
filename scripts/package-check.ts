@@ -21,9 +21,9 @@ const forbiddenPublishedPaths = [
 	/^\.github\//,
 	/^scripts\//,
 	/^bun\.lock$/,
-	/^eslint\.config\.mjs$/,
+	/^\.ox(?:lint|fmt)rc\.json$/,
+	/^tsdown\.config\.mts$/,
 	/^tsconfig(?:\.build)?\.json$/,
-	/^\.prettierrc$/,
 ];
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
