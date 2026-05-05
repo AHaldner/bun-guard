@@ -1,7 +1,7 @@
 {
 	"name": "@tihn/bun-guard",
 	"description": "A security scanner for Bun's package manager",
-	"version": "1.4.0",
+	"version": "1.4.1",
 	"author": "Andrin Haldner",
 	"license": "MIT",
 	"types": "./dist/index.d.ts",
@@ -23,14 +23,18 @@
 	"keywords": [
 		"bun",
 		"security",
-		"provider"
+		"security-scanner",
+		"bun-security-scanner",
+		"osv",
+		"vulnerability-scanner",
+		"dependency-scanner"
 	],
 	"scripts": {
 		"build": "tsdown",
 		"prepack": "bun run build",
 		"package:check": "bun scripts/package-check.ts",
 		"typecheck": "tsc --noEmit",
-		"lint": "oxlint",
+		"lint": "oxlint --type-aware && tsc --noEmit",
 		"lint:fix": "oxlint --fix",
 		"format": "oxfmt",
 		"format:check": "oxfmt --check",
