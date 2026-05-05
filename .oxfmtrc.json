@@ -1,0 +1,14 @@
+{
+	"$schema": "./node_modules/oxfmt/configuration_schema.json",
+	"singleQuote": true,
+	"semi": true,
+	"printWidth": 100,
+	"trailingComma": "all",
+	"arrowParens": "avoid",
+	"bracketSpacing": true,
+	"useTabs": true,
+	"quoteProps": "consistent",
+	"sortImports": false,
+	"sortPackageJson": false,
+	"ignorePatterns": ["node_modules/**", "dist/**", "bench/results/**"]
+}

@@ -1,0 +1,99 @@
+{
+	"languages": {
+		"JSON": {
+			"format_on_save": "on",
+			"tab_size": 4,
+			"language_servers": ["!prettier", "..."],
+			"formatter": {
+				"external": {
+					"command": "tools/zed-oxfmt",
+					"arguments": ["{buffer_path}"]
+				}
+			}
+		},
+		"JSONC": {
+			"format_on_save": "on",
+			"tab_size": 4,
+			"language_servers": ["!prettier", "..."],
+			"formatter": {
+				"external": {
+					"command": "tools/zed-oxfmt",
+					"arguments": ["{buffer_path}"]
+				}
+			}
+		},
+		"HTML": {
+			"format_on_save": "on",
+			"tab_size": 4,
+			"language_servers": ["!prettier", "..."],
+			"formatter": {
+				"external": {
+					"command": "tools/zed-oxfmt",
+					"arguments": ["{buffer_path}"]
+				}
+			}
+		},
+		"CSS": {
+			"format_on_save": "on",
+			"tab_size": 4,
+			"language_servers": ["!prettier", "..."],
+			"formatter": {
+				"external": {
+					"command": "tools/zed-oxfmt",
+					"arguments": ["{buffer_path}"]
+				}
+			}
+		},
+		"TypeScript": {
+			"format_on_save": "on",
+			"formatter": [
+				{
+					"language_server": {
+						"name": "oxfmt"
+					}
+				}
+			]
+		},
+		"TSX": {
+			"format_on_save": "on",
+			"formatter": [
+				{
+					"language_server": {
+						"name": "oxfmt"
+					}
+				}
+			]
+		},
+		"JavaScript": {
+			"format_on_save": "on",
+			"formatter": [
+				{
+					"language_server": {
+						"name": "oxfmt"
+					}
+				}
+			]
+		},
+		"XML": {
+			"format_on_save": "on",
+			"tab_size": 4,
+			"language_servers": ["!prettier", "..."],
+			"formatter": {
+				"external": {
+					"command": "tools/zed-xmlfmt",
+					"arguments": ["{buffer_path}"]
+				}
+			}
+		}
+	},
+	"lsp": {
+		"oxfmt": {
+			"initialization_options": {
+				"settings": {
+					"fmt.configPath": ".oxfmtrc.json",
+					"run": "onSave"
+				}
+			}
+		}
+	}
+}

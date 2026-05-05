@@ -24,7 +24,7 @@
 			"@api/*": ["./src/api/*"],
 			"@cache/*": ["./src/cache/*"],
 			"@utils/*": ["./src/utils/*"],
-			"@validators/*": ["./src/validators/*"],
-		},
-	},
+			"@validators/*": ["./src/validators/*"]
+		}
+	}
 }

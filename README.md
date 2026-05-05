@@ -44,7 +44,7 @@ For each package during installation, Bun Guard:
 The package exports a single scanner implementation:
 
 ```typescript
-export const scanner: Bun.Security.Scanner
+export const scanner: Bun.Security.Scanner;
 ```
 
 Implements Bun's [Security Scanner API](https://bun.com/docs/install/security-scanner-api) version `1`.
@@ -109,6 +109,8 @@ bun link @tihn/bun-guard
 ```bash
 bun run lint
 bun run lint:fix
+bun run format
+bun run format:check
 ```
 
 ### Publishing
