@@ -8,6 +8,7 @@ import { logger } from '@utils/logger';
 
 const BATCH_SIZE = 100;
 const BATCH_QUERY_CONCURRENCY = 4;
+const FALLBACK_QUERY_CONCURRENCY = 8;
 const VULN_DETAIL_CONCURRENCY = 12;
 const DEFAULT_OSV_REQUEST_TIMEOUT_MS = 10_000;
 const OSV_REQUEST_TIMEOUT_ENV = 'BUN_GUARD_OSV_REQUEST_TIMEOUT_MS';
@@ -36,10 +37,7 @@ const isAbortError = (error: unknown): boolean => {
 	return error.name === 'AbortError' || error.name === 'TimeoutError';
 };
 
-const fetchOSV = async (
-	endpoint: string,
-	init: Parameters<typeof fetch>[1],
-): Promise<Response> => {
+const fetchOSV = async (endpoint: string, init: Parameters<typeof fetch>[1]): Promise<Response> => {
 	const timeoutMs = getOSVRequestTimeoutMs();
 
 	try {
@@ -144,6 +142,36 @@ const preserveUnresolvedVulnerabilityRefs = (
 	return [...vulnerabilitiesById.values()];
 };
 
+type PackageGroup = {
+	packageInfo: Bun.Security.Package;
+	resultIndexes: number[];
+};
+
+type FallbackPackageGroup = PackageGroup & {
+	vulnerabilityRefs?: VulnerabilityRef[];
+	resolvedVulnerabilities?: OSVVulnerability[];
+};
+
+const applyIndividualFallback = async (
+	packageGroups: FallbackPackageGroup[],
+	allResults: OSVVulnerability[][],
+): Promise<void> => {
+	await runWithConcurrency(packageGroups, FALLBACK_QUERY_CONCURRENCY, async packageGroup => {
+		const fallbackVulnerabilities = await queryOSV(packageGroup.packageInfo);
+		const vulnerabilitiesToReport = packageGroup.vulnerabilityRefs
+			? preserveUnresolvedVulnerabilityRefs(
+					packageGroup.vulnerabilityRefs,
+					packageGroup.resolvedVulnerabilities || [],
+					fallbackVulnerabilities,
+				)
+			: fallbackVulnerabilities;
+
+		for (const resultIndex of packageGroup.resultIndexes) {
+			allResults[resultIndex] = vulnerabilitiesToReport;
+		}
+	});
+};
+
 const resolveVulnerabilityDetails = async (
 	vulnerabilityRefs: VulnerabilityRef[],
 ): Promise<Map<string, OSVVulnerability>> => {
@@ -183,13 +211,7 @@ const queryOSVBatch = async (packages: Bun.Security.Package[]): Promise<OSVVulne
 	if (packages.length === 0) return [];
 
 	const allResults: OSVVulnerability[][] = Array.from({ length: packages.length }, () => []);
-	const packageGroupsByKey = new Map<
-		string,
-		{
-			packageInfo: Bun.Security.Package;
-			resultIndexes: number[];
-		}
-	>();
+	const packageGroupsByKey = new Map<string, PackageGroup>();
 
 	for (let packageIndex = 0; packageIndex < packages.length; packageIndex++) {
 		const packageInfo = packages[packageIndex];
@@ -208,100 +230,103 @@ const queryOSVBatch = async (packages: Bun.Security.Package[]): Promise<OSVVulne
 	}
 
 	const packageGroups = [...packageGroupsByKey.values()];
-	const packageGroupChunks: Array<
-		Array<{ packageInfo: Bun.Security.Package; resultIndexes: number[] }>
-	> = [];
+	const packageGroupChunks: PackageGroup[][] = [];
 
 	for (let i = 0; i < packageGroups.length; i += BATCH_SIZE) {
 		packageGroupChunks.push(packageGroups.slice(i, i + BATCH_SIZE));
 	}
 
 	await runWithConcurrency(packageGroupChunks, BATCH_QUERY_CONCURRENCY, async packageGroupChunk => {
-		const batchRequestBody: OSVBatchRequest = {
-			queries: packageGroupChunk.map(({ packageInfo }) => ({
-				version: packageInfo.version,
-				package: { name: packageInfo.name, ecosystem: 'npm' },
-			})),
-		};
+		try {
+			const batchRequestBody: OSVBatchRequest = {
+				queries: packageGroupChunk.map(({ packageInfo }) => ({
+					version: packageInfo.version,
+					package: { name: packageInfo.name, ecosystem: 'npm' },
+				})),
+			};
 
-		const response = await fetchOSV('/v1/querybatch', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(batchRequestBody),
-		});
+			const response = await fetchOSV('/v1/querybatch', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(batchRequestBody),
+			});
 
-		if (!response.ok) {
-			throw new OSVBatchQueryError(`OSV batch query failed with status ${response.status}`);
-		}
+			if (!response.ok) {
+				throw new OSVBatchQueryError(`OSV batch query failed with status ${response.status}`);
+			}
 
-		const batchResponseData = await response.json();
-		if (!isValidOSVBatchResponse(batchResponseData)) {
-			throw new OSVBatchQueryError('OSV batch query returned an invalid response payload');
-		}
+			const batchResponseData = await response.json();
+			if (!isValidOSVBatchResponse(batchResponseData)) {
+				throw new OSVBatchQueryError('OSV batch query returned an invalid response payload');
+			}
 
-		const batchResults = batchResponseData.results || [];
-		if (batchResults.length !== packageGroupChunk.length) {
-			throw new OSVBatchQueryError(
-				`OSV batch query returned ${batchResults.length} results for ${packageGroupChunk.length} queries`,
-			);
-		}
+			const batchResults = batchResponseData.results || [];
+			if (batchResults.length !== packageGroupChunk.length) {
+				throw new OSVBatchQueryError(
+					`OSV batch query returned ${batchResults.length} results for ${packageGroupChunk.length} queries`,
+				);
+			}
 
-		const vulnerabilityRefsPerPackage: VulnerabilityRef[][] = [];
-		const allVulnerabilityRefs: VulnerabilityRef[] = [];
+			const vulnerabilityRefsPerPackage: VulnerabilityRef[][] = [];
+			const allVulnerabilityRefs: VulnerabilityRef[] = [];
 
-		for (let packageOffset = 0; packageOffset < packageGroupChunk.length; packageOffset++) {
-			const queryResult = batchResults[packageOffset];
-			const vulnerabilityRefs = (queryResult?.vulns || [])
-				.filter(
-					vulnerability => typeof vulnerability.id === 'string' && vulnerability.id.length > 0,
-				)
-				.map(vulnerability => ({
-					id: vulnerability.id,
-					modified: vulnerability.modified,
-				}));
+			for (let packageOffset = 0; packageOffset < packageGroupChunk.length; packageOffset++) {
+				const queryResult = batchResults[packageOffset];
+				const vulnerabilityRefs = (queryResult?.vulns || [])
+					.filter(
+						vulnerability => typeof vulnerability.id === 'string' && vulnerability.id.length > 0,
+					)
+					.map(vulnerability => ({
+						id: vulnerability.id,
+						modified: vulnerability.modified,
+					}));
 
-			vulnerabilityRefsPerPackage.push(vulnerabilityRefs);
-			allVulnerabilityRefs.push(...vulnerabilityRefs);
-		}
+				vulnerabilityRefsPerPackage.push(vulnerabilityRefs);
+				allVulnerabilityRefs.push(...vulnerabilityRefs);
+			}
 
-		const resolvedVulnerabilityDetails = await resolveVulnerabilityDetails(allVulnerabilityRefs);
+			const resolvedVulnerabilityDetails = await resolveVulnerabilityDetails(allVulnerabilityRefs);
+			const fallbackPackageGroups: FallbackPackageGroup[] = [];
 
-		for (let packageOffset = 0; packageOffset < packageGroupChunk.length; packageOffset++) {
-			const packageGroup = packageGroupChunk[packageOffset];
-			if (!packageGroup) continue;
+			for (let packageOffset = 0; packageOffset < packageGroupChunk.length; packageOffset++) {
+				const packageGroup = packageGroupChunk[packageOffset];
+				if (!packageGroup) continue;
 
-			const { packageInfo, resultIndexes } = packageGroup;
-			const vulnerabilityRefs = vulnerabilityRefsPerPackage[packageOffset] || [];
-			if (vulnerabilityRefs.length === 0) {
-				for (const resultIndex of resultIndexes) {
-					allResults[resultIndex] = [];
+				const { resultIndexes } = packageGroup;
+				const vulnerabilityRefs = vulnerabilityRefsPerPackage[packageOffset] || [];
+				if (vulnerabilityRefs.length === 0) {
+					for (const resultIndex of resultIndexes) {
+						allResults[resultIndex] = [];
+					}
+
+					continue;
 				}
 
-				continue;
-			}
+				const resolvedVulnerabilities = vulnerabilityRefs
+					.map(vulnerabilityRef => resolvedVulnerabilityDetails.get(vulnerabilityRef.id))
+					.filter((vulnerability): vulnerability is OSVVulnerability => Boolean(vulnerability));
 
-			const resolvedVulnerabilities = vulnerabilityRefs
-				.map(vulnerabilityRef => resolvedVulnerabilityDetails.get(vulnerabilityRef.id))
-				.filter((vulnerability): vulnerability is OSVVulnerability => Boolean(vulnerability));
+				if (resolvedVulnerabilities.length === vulnerabilityRefs.length) {
+					for (const resultIndex of resultIndexes) {
+						allResults[resultIndex] = resolvedVulnerabilities;
+					}
 
-			if (resolvedVulnerabilities.length === vulnerabilityRefs.length) {
-				for (const resultIndex of resultIndexes) {
-					allResults[resultIndex] = resolvedVulnerabilities;
+					continue;
 				}
 
-				continue;
+				fallbackPackageGroups.push({
+					...packageGroup,
+					vulnerabilityRefs,
+					resolvedVulnerabilities,
+				});
 			}
 
-			const fallbackVulnerabilities = await queryOSV(packageInfo);
-			const vulnerabilitiesToReport = preserveUnresolvedVulnerabilityRefs(
-				vulnerabilityRefs,
-				resolvedVulnerabilities,
-				fallbackVulnerabilities,
+			await applyIndividualFallback(fallbackPackageGroups, allResults);
+		} catch {
+			logger.error(
+				'Batch vulnerability chunk failed. Falling back to individual package queries for that chunk.',
 			);
-
-			for (const resultIndex of resultIndexes) {
-				allResults[resultIndex] = vulnerabilitiesToReport;
-			}
+			await applyIndividualFallback(packageGroupChunk, allResults);
 		}
 	});
 

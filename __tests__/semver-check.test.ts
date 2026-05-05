@@ -69,8 +69,9 @@ describe('Semver range checks', () => {
 
 	test('flags when resolved version does not satisfy requestedRange', async () => {
 		const packageWithMismatchedRange = createMockPackage('semver-mismatch-test', '1.0.0');
-		(packageWithMismatchedRange as Bun.Security.Package & { requestedRange: string }).requestedRange =
-			'^2.0.0';
+		(
+			packageWithMismatchedRange as Bun.Security.Package & { requestedRange: string }
+		).requestedRange = '^2.0.0';
 
 		const scanResults = await scanner.scan({ packages: [packageWithMismatchedRange] });
 
@@ -119,8 +120,7 @@ describe('Semver range checks', () => {
 
 	test('sets advisory levels independently for overridden and non-overridden packages', async () => {
 		const overriddenPkg = createMockPackage('overridden-pkg', '1.0.0');
-		(overriddenPkg as Bun.Security.Package & { requestedRange: string }).requestedRange =
-			'^2.0.0';
+		(overriddenPkg as Bun.Security.Package & { requestedRange: string }).requestedRange = '^2.0.0';
 
 		const nonOverriddenPkg = createMockPackage('non-overridden-pkg', '1.0.0');
 		(nonOverriddenPkg as Bun.Security.Package & { requestedRange: string }).requestedRange =
@@ -135,5 +135,24 @@ describe('Semver range checks', () => {
 
 		expect(overriddenAdvisory?.level).toBe('warn');
 		expect(nonOverriddenAdvisory?.level).toBe('fatal');
+	});
+
+	test('does not read package.json when all packages satisfy requested ranges', async () => {
+		let packageJsonReadCount = 0;
+
+		Bun.file = ((path: string) => {
+			if (path === 'package.json') {
+				packageJsonReadCount += 1;
+				return createMockBunFile(JSON.stringify({}));
+			}
+			return originalBunFile(path);
+		}) as typeof Bun.file;
+
+		const scanResults = await scanner.scan({
+			packages: [createMockPackage('safe-range-pkg', '1.0.0')],
+		});
+
+		expect(scanResults).toEqual([]);
+		expect(packageJsonReadCount).toBe(0);
 	});
 });

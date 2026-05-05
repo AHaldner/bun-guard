@@ -27,5 +27,5 @@ jobs:
 
       - name: Run tests
         env:
-          CI: "false"
+          CI: 'false'
         run: bun test

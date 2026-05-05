@@ -53,8 +53,7 @@ export const isValidVulnerability = (vulnerability: unknown): vulnerability is O
 		(vulnerability.database_specific === undefined ||
 			isValidDatabaseSpecific(vulnerability.database_specific)) &&
 		(vulnerability.references === undefined ||
-			(Array.isArray(vulnerability.references) &&
-				vulnerability.references.every(isValidReference)))
+			(Array.isArray(vulnerability.references) && vulnerability.references.every(isValidReference)))
 	);
 };
 

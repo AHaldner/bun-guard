@@ -4,9 +4,11 @@ import { logger } from '@utils/logger';
 export const validateSemverRange = async (
 	packages: Bun.Security.Package[],
 ): Promise<Bun.Security.Advisory[]> => {
-	const advisoryResults: Bun.Security.Advisory[] = [];
-
-	const overriddenPackages = await getOverriddenPackages();
+	const mismatchedPackages: Array<{
+		packageInfo: Bun.Security.Package;
+		resolvedVersion: string;
+		requestedVersionRange: string;
+	}> = [];
 
 	for (const packageInfo of packages) {
 		const resolvedVersion = packageInfo?.version;
@@ -14,35 +16,37 @@ export const validateSemverRange = async (
 
 		if (!resolvedVersion || !requestedVersionRange) continue;
 
-		Promise.resolve()
-			.then(() => {
-				const satisfiesRequestedRange = Bun.semver.satisfies(
-					resolvedVersion,
-					requestedVersionRange,
-				);
+		try {
+			if (Bun.semver.satisfies(resolvedVersion, requestedVersionRange)) continue;
 
-				if (!satisfiesRequestedRange) {
-					const isOverridden = overriddenPackages.has(packageInfo.name);
-					const level = isOverridden ? 'warn' : 'fatal';
-
-					advisoryResults.push({
-						level,
-						package: packageInfo.name,
-						url: null,
-						description: `Resolved version ${resolvedVersion} does not satisfy requested range ${requestedVersionRange}${
-							isOverridden ? ' (allowed via overrides/resolutions)' : ''
-						}`,
-					});
-				}
-			})
-			.catch(() => {
-				logger.warn(
-					`Could not parse semver range "${requestedVersionRange}" for package "${packageInfo.name}". Skipping semver check.`,
-				);
+			mismatchedPackages.push({
+				packageInfo,
+				resolvedVersion,
+				requestedVersionRange,
 			});
+		} catch {
+			logger.warn(
+				`Could not parse semver range "${requestedVersionRange}" for package "${packageInfo.name}". Skipping semver check.`,
+			);
+		}
 	}
 
-	return advisoryResults;
+	if (mismatchedPackages.length === 0) return [];
+
+	const overriddenPackages = await getOverriddenPackages();
+
+	return mismatchedPackages.map(({ packageInfo, resolvedVersion, requestedVersionRange }) => {
+		const isOverridden = overriddenPackages.has(packageInfo.name);
+
+		return {
+			level: isOverridden ? 'warn' : 'fatal',
+			package: packageInfo.name,
+			url: null,
+			description: `Resolved version ${resolvedVersion} does not satisfy requested range ${requestedVersionRange}${
+				isOverridden ? ' (allowed via overrides/resolutions)' : ''
+			}`,
+		};
+	});
 };
 
 const getOverriddenPackages = async (): Promise<Set<string>> => {
