@@ -4,10 +4,13 @@ import {
 	persistVulnerabilityCache,
 } from '@cache/osv-vulnerability-cache';
 import { isValidOSVBatchResponse, isValidOSVResponse, isValidVulnerability } from '@utils/helpers';
+import { logger } from '@utils/logger';
 
 const BATCH_SIZE = 100;
 const BATCH_QUERY_CONCURRENCY = 4;
 const VULN_DETAIL_CONCURRENCY = 12;
+const DEFAULT_OSV_REQUEST_TIMEOUT_MS = 10_000;
+const OSV_REQUEST_TIMEOUT_ENV = 'BUN_GUARD_OSV_REQUEST_TIMEOUT_MS';
 const inFlightVulnerabilityRequests = new Map<string, Promise<OSVVulnerability | null>>();
 
 class OSVBatchQueryError extends Error {
@@ -16,6 +19,44 @@ class OSVBatchQueryError extends Error {
 		this.name = 'OSVBatchQueryError';
 	}
 }
+
+const getOSVRequestTimeoutMs = (): number => {
+	const configuredTimeoutMs = Number(Bun.env[OSV_REQUEST_TIMEOUT_ENV]);
+
+	if (Number.isFinite(configuredTimeoutMs) && configuredTimeoutMs > 0) {
+		return configuredTimeoutMs;
+	}
+
+	return DEFAULT_OSV_REQUEST_TIMEOUT_MS;
+};
+
+const isAbortError = (error: unknown): boolean => {
+	if (!(error instanceof Error || error instanceof DOMException)) return false;
+
+	return error.name === 'AbortError' || error.name === 'TimeoutError';
+};
+
+const fetchOSV = async (
+	endpoint: string,
+	init: Parameters<typeof fetch>[1],
+): Promise<Response> => {
+	const timeoutMs = getOSVRequestTimeoutMs();
+
+	try {
+		return await fetch(`https://api.osv.dev${endpoint}`, {
+			...init,
+			signal: AbortSignal.timeout(timeoutMs),
+		});
+	} catch (error) {
+		if (isAbortError(error)) {
+			logger.warn(
+				`OSV request to ${endpoint} timed out after ${timeoutMs}ms. Falling back where possible; vulnerability results may be incomplete.`,
+			);
+		}
+
+		throw error;
+	}
+};
 
 const runWithConcurrency = async <T>(
 	items: T[],
@@ -46,7 +87,7 @@ const fetchVulnerabilityById = async (id: string): Promise<OSVVulnerability | nu
 	if (inFlightRequest) return inFlightRequest;
 
 	const requestPromise = (async () => {
-		return fetch(`https://api.osv.dev/v1/vulns/${encodeURIComponent(id)}`, {
+		return fetchOSV(`/v1/vulns/${encodeURIComponent(id)}`, {
 			method: 'GET',
 		})
 			.then(async (response): Promise<OSVVulnerability | null> => {
@@ -79,23 +120,28 @@ const fetchVulnDetailsByIds = async (ids: string[]): Promise<Map<string, OSVVuln
 	return vulnerabilityDetailsMap;
 };
 
-const mergeVulnerabilities = (
-	primaryVulnerabilities: OSVVulnerability[],
-	secondaryVulnerabilities: OSVVulnerability[],
+const preserveUnresolvedVulnerabilityRefs = (
+	vulnerabilityRefs: VulnerabilityRef[],
+	resolvedVulnerabilities: OSVVulnerability[],
+	fallbackVulnerabilities: OSVVulnerability[],
 ): OSVVulnerability[] => {
-	const mergedById = new Map<string, OSVVulnerability>();
+	const vulnerabilitiesById = new Map<string, OSVVulnerability>();
 
-	for (const vulnerability of primaryVulnerabilities) {
-		mergedById.set(vulnerability.id, vulnerability);
+	for (const vulnerability of resolvedVulnerabilities) {
+		vulnerabilitiesById.set(vulnerability.id, vulnerability);
 	}
 
-	for (const vulnerability of secondaryVulnerabilities) {
-		if (!mergedById.has(vulnerability.id)) {
-			mergedById.set(vulnerability.id, vulnerability);
+	for (const vulnerability of fallbackVulnerabilities) {
+		vulnerabilitiesById.set(vulnerability.id, vulnerability);
+	}
+
+	for (const vulnerabilityRef of vulnerabilityRefs) {
+		if (!vulnerabilitiesById.has(vulnerabilityRef.id)) {
+			vulnerabilitiesById.set(vulnerabilityRef.id, { id: vulnerabilityRef.id });
 		}
 	}
 
-	return [...mergedById.values()];
+	return [...vulnerabilitiesById.values()];
 };
 
 const resolveVulnerabilityDetails = async (
@@ -178,7 +224,7 @@ const queryOSVBatch = async (packages: Bun.Security.Package[]): Promise<OSVVulne
 			})),
 		};
 
-		const response = await fetch('https://api.osv.dev/v1/querybatch', {
+		const response = await fetchOSV('/v1/querybatch', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(batchRequestBody),
@@ -194,6 +240,12 @@ const queryOSVBatch = async (packages: Bun.Security.Package[]): Promise<OSVVulne
 		}
 
 		const batchResults = batchResponseData.results || [];
+		if (batchResults.length !== packageGroupChunk.length) {
+			throw new OSVBatchQueryError(
+				`OSV batch query returned ${batchResults.length} results for ${packageGroupChunk.length} queries`,
+			);
+		}
+
 		const vulnerabilityRefsPerPackage: VulnerabilityRef[][] = [];
 		const allVulnerabilityRefs: VulnerabilityRef[] = [];
 
@@ -241,10 +293,11 @@ const queryOSVBatch = async (packages: Bun.Security.Package[]): Promise<OSVVulne
 			}
 
 			const fallbackVulnerabilities = await queryOSV(packageInfo);
-			const vulnerabilitiesToReport =
-				fallbackVulnerabilities.length === 0
-					? resolvedVulnerabilities
-					: mergeVulnerabilities(resolvedVulnerabilities, fallbackVulnerabilities);
+			const vulnerabilitiesToReport = preserveUnresolvedVulnerabilityRefs(
+				vulnerabilityRefs,
+				resolvedVulnerabilities,
+				fallbackVulnerabilities,
+			);
 
 			for (const resultIndex of resultIndexes) {
 				allResults[resultIndex] = vulnerabilitiesToReport;
@@ -266,7 +319,7 @@ const queryOSV = async (packageInfo: Bun.Security.Package): Promise<OSVVulnerabi
 		},
 	};
 
-	return fetch('https://api.osv.dev/v1/query', {
+	return fetchOSV('/v1/query', {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
