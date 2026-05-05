@@ -190,6 +190,90 @@ describe('Security Scanner', () => {
 		expect(scanResults[0]?.level).toBe('fatal');
 	});
 
+	test('should fall back to individual queries when batch query returns non-2xx', async () => {
+		let individualQueryCount = 0;
+		const baseMockFetch = createMockOSVFetch(originalFetch);
+
+		const failingBatchFetch = (async (
+			input: Parameters<typeof fetch>[0],
+			init?: Parameters<typeof fetch>[1],
+		): ReturnType<typeof fetch> => {
+			const url = new URL(getUrlString(input as string | URL | Request));
+
+			if (url.pathname === '/v1/querybatch') {
+				return asJsonResponse({ message: 'server error' }, 500);
+			}
+
+			if (url.pathname === '/v1/query') {
+				individualQueryCount += 1;
+			}
+
+			return baseMockFetch(input, init);
+		}) as typeof fetch;
+		failingBatchFetch.preconnect = originalFetch.preconnect.bind(originalFetch);
+
+		const previousFetch = globalThis.fetch;
+		globalThis.fetch = failingBatchFetch;
+
+		try {
+			const packagesToScan = [
+				createMockPackage('lodash', '4.17.21'),
+				createMockPackage('event-stream', '3.3.6'),
+			];
+
+			const scanResults = await scanner.scan({ packages: packagesToScan });
+
+			expect(individualQueryCount).toBe(2);
+			expect(scanResults.length).toBe(1);
+			expect(scanResults[0]?.package).toBe('event-stream');
+			expect(scanResults[0]?.level).toBe('fatal');
+		} finally {
+			globalThis.fetch = previousFetch;
+		}
+	});
+
+	test('should fall back to individual queries when batch query returns invalid payload', async () => {
+		let individualQueryCount = 0;
+		const baseMockFetch = createMockOSVFetch(originalFetch);
+
+		const invalidBatchFetch = (async (
+			input: Parameters<typeof fetch>[0],
+			init?: Parameters<typeof fetch>[1],
+		): ReturnType<typeof fetch> => {
+			const url = new URL(getUrlString(input as string | URL | Request));
+
+			if (url.pathname === '/v1/querybatch') {
+				return asJsonResponse({ unexpected: [] });
+			}
+
+			if (url.pathname === '/v1/query') {
+				individualQueryCount += 1;
+			}
+
+			return baseMockFetch(input, init);
+		}) as typeof fetch;
+		invalidBatchFetch.preconnect = originalFetch.preconnect.bind(originalFetch);
+
+		const previousFetch = globalThis.fetch;
+		globalThis.fetch = invalidBatchFetch;
+
+		try {
+			const packagesToScan = [
+				createMockPackage('lodash', '4.17.21'),
+				createMockPackage('event-stream', '3.3.6'),
+			];
+
+			const scanResults = await scanner.scan({ packages: packagesToScan });
+
+			expect(individualQueryCount).toBe(2);
+			expect(scanResults.length).toBe(1);
+			expect(scanResults[0]?.package).toBe('event-stream');
+			expect(scanResults[0]?.level).toBe('fatal');
+		} finally {
+			globalThis.fetch = previousFetch;
+		}
+	});
+
 	test('should return correct advisory structure', async () => {
 		const packagesToScan = [createMockPackage('event-stream', '3.3.6')];
 

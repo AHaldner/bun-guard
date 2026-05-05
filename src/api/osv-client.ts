@@ -4,12 +4,18 @@ import {
 	persistVulnerabilityCache,
 } from '@cache/osv-vulnerability-cache';
 import { isValidOSVBatchResponse, isValidOSVResponse, isValidVulnerability } from '@utils/helpers';
-import { logger } from '@utils/logger';
 
 const BATCH_SIZE = 100;
 const BATCH_QUERY_CONCURRENCY = 4;
 const VULN_DETAIL_CONCURRENCY = 12;
 const inFlightVulnerabilityRequests = new Map<string, Promise<OSVVulnerability | null>>();
+
+class OSVBatchQueryError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = 'OSVBatchQueryError';
+	}
+}
 
 const runWithConcurrency = async <T>(
 	items: T[],
@@ -179,14 +185,12 @@ const queryOSVBatch = async (packages: Bun.Security.Package[]): Promise<OSVVulne
 		});
 
 		if (!response.ok) {
-			logger.error(`OSV batch query failed with status ${response.status}`);
-			return;
+			throw new OSVBatchQueryError(`OSV batch query failed with status ${response.status}`);
 		}
 
 		const batchResponseData = await response.json();
 		if (!isValidOSVBatchResponse(batchResponseData)) {
-			logger.error('OSV batch query returned an invalid response payload');
-			return;
+			throw new OSVBatchQueryError('OSV batch query returned an invalid response payload');
 		}
 
 		const batchResults = batchResponseData.results || [];
