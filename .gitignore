@@ -1,7 +1,0 @@
-# Dependencies
-node_modules
-dist
-*.tgz
-
-# MacOS system files
-.DS_Store
