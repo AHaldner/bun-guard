@@ -376,9 +376,7 @@ const hasHighImpactCvssV3Metric = (score: string): boolean => {
 	);
 
 	return (
-		metricValues.get('C') === 'H' ||
-		metricValues.get('I') === 'H' ||
-		metricValues.get('A') === 'H'
+		metricValues.get('C') === 'H' || metricValues.get('I') === 'H' || metricValues.get('A') === 'H'
 	);
 };
 

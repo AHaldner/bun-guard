@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] - 2026-06-03
+
+### Fixed
+
+- Treat CVSS v3 vulnerabilities with high confidentiality, integrity, or availability impact as fatal, even when other impact metrics are none
+- Hydrate OSV vulnerability details again when disk cache entries lack trusted severity metadata, preventing stripped cached records from downgrading blocking advisories
+- Preserve fatal advisory levels when duplicate advisory text is also reported as a warning
+
 ## [1.4.1] - 2026-05-05
 
 ### Fixed
@@ -126,6 +134,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhance security advisory structure with detailed vulnerability information
 - Severity mapping (CRITICAL → fatal, others → warn)
 
+[1.4.2]: https://github.com/AHaldner/bun-guard/releases/tag/v1.4.2
 [1.4.1]: https://github.com/AHaldner/bun-guard/releases/tag/v1.4.1
 [1.4.0]: https://github.com/AHaldner/bun-guard/releases/tag/v1.4.0
 [1.3.1]: https://github.com/AHaldner/bun-guard/releases/tag/v1.3.1

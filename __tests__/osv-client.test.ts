@@ -110,7 +110,9 @@ describe('OSV vulnerability scanning', () => {
 
 			if (url.pathname === '/v1/querybatch') {
 				return asJsonResponse({
-					results: [{ vulns: [{ id: vulnerabilityId, modified: highIntegrityVulnerability.modified }] }],
+					results: [
+						{ vulns: [{ id: vulnerabilityId, modified: highIntegrityVulnerability.modified }] },
+					],
 				});
 			}
 
