@@ -87,6 +87,61 @@ describe('OSV vulnerability scanning', () => {
 		expect(scanResults[0]?.package).toBe('event-stream');
 		expect(scanResults[0]?.level).toBe('fatal');
 	});
+
+	test('treats high integrity or availability CVSS vectors as fatal when confidentiality is none', async () => {
+		const vulnerabilityId = 'GHSA-cvss-high-integrity';
+		const highIntegrityVulnerability: OSVVulnerability = {
+			id: vulnerabilityId,
+			modified: '2026-06-03T00:00:00Z',
+			summary: 'High integrity impact without confidentiality impact',
+			severity: [
+				{
+					type: 'CVSS_V3',
+					score: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N',
+				},
+			],
+		};
+
+		const cvssFetch = (async (
+			input: Parameters<typeof fetch>[0],
+			_init?: Parameters<typeof fetch>[1],
+		): ReturnType<typeof fetch> => {
+			const url = new URL(getUrlString(input as string | URL | Request));
+
+			if (url.pathname === '/v1/querybatch') {
+				return asJsonResponse({
+					results: [
+						{ vulns: [{ id: vulnerabilityId, modified: highIntegrityVulnerability.modified }] },
+					],
+				});
+			}
+
+			if (url.pathname.startsWith('/v1/vulns/')) {
+				return asJsonResponse(highIntegrityVulnerability);
+			}
+
+			if (url.pathname === '/v1/query') {
+				return asJsonResponse({ vulns: [highIntegrityVulnerability] });
+			}
+
+			return asJsonResponse({ message: `Unhandled endpoint: ${url.pathname}` }, 404);
+		}) as typeof fetch;
+		cvssFetch.preconnect = originalFetch.preconnect.bind(originalFetch);
+
+		const previousFetch = globalThis.fetch;
+		globalThis.fetch = cvssFetch;
+
+		try {
+			const scanResults = await scanner.scan({
+				packages: [createMockPackage('cvss-high-integrity', '1.0.0')],
+			});
+
+			expect(scanResults).toHaveLength(1);
+			expect(scanResults[0]?.level).toBe('fatal');
+		} finally {
+			globalThis.fetch = previousFetch;
+		}
+	});
 });
 
 describe('OSV batch degradation', () => {
