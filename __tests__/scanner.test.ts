@@ -2,8 +2,10 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:tes
 import { scanner } from 'src';
 import { shouldSkipScan } from '@utils/helpers';
 import {
+	asJsonResponse,
 	createMockOSVFetch,
 	createMockPackage,
+	getUrlString,
 	restoreTTYAvailability,
 	setTTYAvailability,
 } from './helpers/scanner-fixtures';
@@ -88,6 +90,73 @@ describe('Security Scanner', () => {
 		});
 
 		expect(Array.isArray(scanResults)).toBe(true);
+	});
+
+	test('keeps a fatal advisory when duplicate advisory text also has a warning', async () => {
+		const fatalVulnerability: OSVVulnerability = {
+			id: 'GHSA-fatal-collision',
+			modified: '2026-06-03T00:00:00Z',
+			summary: 'Shared advisory summary',
+			database_specific: { severity: 'CRITICAL' },
+			references: [{ type: 'WEB', url: 'https://example.test/advisory' }],
+		};
+		const warningVulnerability: OSVVulnerability = {
+			id: 'GHSA-warning-collision',
+			modified: '2026-06-03T00:00:00Z',
+			summary: fatalVulnerability.summary,
+			references: fatalVulnerability.references,
+		};
+		const vulnerabilities = [fatalVulnerability, warningVulnerability];
+
+		const collisionFetch = (async (
+			input: Parameters<typeof fetch>[0],
+			_init?: Parameters<typeof fetch>[1],
+		): ReturnType<typeof fetch> => {
+			const url = new URL(getUrlString(input as string | URL | Request));
+
+			if (url.pathname === '/v1/querybatch') {
+				return asJsonResponse({
+					results: [
+						{
+							vulns: vulnerabilities.map(vulnerability => ({
+								id: vulnerability.id,
+								modified: vulnerability.modified,
+							})),
+						},
+					],
+				});
+			}
+
+			if (url.pathname.startsWith('/v1/vulns/')) {
+				const vulnerabilityId = decodeURIComponent(url.pathname.split('/').pop() || '');
+				const vulnerability = vulnerabilities.find(({ id }) => id === vulnerabilityId);
+				if (!vulnerability) return asJsonResponse({ message: 'Not found' }, 404);
+
+				return asJsonResponse(vulnerability);
+			}
+
+			if (url.pathname === '/v1/query') {
+				return asJsonResponse({ vulns: vulnerabilities });
+			}
+
+			return asJsonResponse({ message: `Unhandled endpoint: ${url.pathname}` }, 404);
+		}) as typeof fetch;
+		collisionFetch.preconnect = originalFetch.preconnect.bind(originalFetch);
+
+		const previousFetch = globalThis.fetch;
+		globalThis.fetch = collisionFetch;
+
+		try {
+			const scanResults = await scanner.scan({
+				packages: [createMockPackage('dedupe-collision', '1.0.0')],
+			});
+
+			expect(scanResults).toHaveLength(1);
+			expect(scanResults[0]?.level).toBe('fatal');
+			expect(scanResults[0]?.description).toBe(fatalVulnerability.summary);
+		} finally {
+			globalThis.fetch = previousFetch;
+		}
 	});
 });
 

@@ -4,6 +4,18 @@ import { logger } from '@utils/logger';
 import { validateSemverRange } from '@validators/semver-check';
 import { checkPackageVulnerabilities } from '@validators/osv-check';
 
+const mergeAdvisory = (
+	advisories: Map<string, Bun.Security.Advisory>,
+	advisory: Bun.Security.Advisory,
+): void => {
+	const advisoryKey = `${advisory.package}:${advisory.url}:${advisory.description}`;
+	const existingAdvisory = advisories.get(advisoryKey);
+
+	if (!existingAdvisory || (existingAdvisory.level === 'warn' && advisory.level === 'fatal')) {
+		advisories.set(advisoryKey, advisory);
+	}
+};
+
 export const scanner: Bun.Security.Scanner = {
 	version: '1',
 	async scan({ packages }) {
@@ -43,14 +55,13 @@ export const scanner: Bun.Security.Scanner = {
 				}
 			});
 
-		const uniqueAdvisories = Array.from(
-			new Map(
-				securityAdvisories.map(advisory => [
-					`${advisory.package}:${advisory.url}:${advisory.description}`,
-					advisory,
-				]),
-			).values(),
-		);
+		const uniqueAdvisoriesByKey = new Map<string, Bun.Security.Advisory>();
+
+		for (const advisory of securityAdvisories) {
+			mergeAdvisory(uniqueAdvisoriesByKey, advisory);
+		}
+
+		const uniqueAdvisories = Array.from(uniqueAdvisoriesByKey.values());
 
 		return uniqueAdvisories;
 	},
