@@ -362,6 +362,26 @@ const queryOSV = async (packageInfo: Bun.Security.Package): Promise<OSVVulnerabi
 		.catch(() => []);
 };
 
+const hasHighImpactCvssV3Metric = (score: string): boolean => {
+	const metrics = score.split('/');
+	const [version] = metrics;
+
+	if (version !== 'CVSS:3.0' && version !== 'CVSS:3.1') return false;
+
+	const metricValues = new Map(
+		metrics.slice(1).map(metric => {
+			const [key, value] = metric.split(':', 2);
+			return [key, value];
+		}),
+	);
+
+	return (
+		metricValues.get('C') === 'H' ||
+		metricValues.get('I') === 'H' ||
+		metricValues.get('A') === 'H'
+	);
+};
+
 const getAdvisoryLevel = (vulnerability: OSVVulnerability): 'fatal' | 'warn' => {
 	if (vulnerability.database_specific?.severity === 'CRITICAL') {
 		return 'fatal';
@@ -369,20 +389,12 @@ const getAdvisoryLevel = (vulnerability: OSVVulnerability): 'fatal' | 'warn' => 
 
 	if (vulnerability.severity) {
 		for (const severityInfo of vulnerability.severity) {
-			if (severityInfo.type === 'CVSS_V3' && severityInfo.score) {
-				const cvssScoreMatch = severityInfo.score.match(
-					/CVSS:3\.[01]\/.*?\/.*?\/.*?\/.*?\/.*?\/.*?\/(C:[HML])\/(?:I:[HML])\/(?:A:[HML])/,
-				);
-
-				if (!cvssScoreMatch) continue;
-
-				if (
-					severityInfo.score.includes('C:H') ||
-					severityInfo.score.includes('I:H') ||
-					severityInfo.score.includes('A:H')
-				) {
-					return 'fatal';
-				}
+			if (
+				severityInfo.type === 'CVSS_V3' &&
+				severityInfo.score &&
+				hasHighImpactCvssV3Metric(severityInfo.score)
+			) {
+				return 'fatal';
 			}
 		}
 	}
